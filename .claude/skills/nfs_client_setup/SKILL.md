@@ -12,6 +12,26 @@ NFS-client-specific variables set directly in the playbook. See
 each role's own `SKILL.md` (`packages_install`, `files_create`,
 `service_state`, `mount_setup`) for what it does in the general case.
 
+## Policy & workload awareness
+
+This playbook doesn't own an `ansible/roles/<name>/` directory of its
+own — it reuses `packages_install`, `files_create`, `service_state`, `mount_setup`, each of which already carries its own
+policy/workload staleness check in its own `SKILL.md` (see
+`docs/ARCHITECTURE.md`'s "Policy & workload awareness"). What's specific to
+*this* playbook is the `nfs_client_setup.yml`-specific variables set directly
+there rather than in any role's own `defaults/main.yml` — check whether
+those need updating too:
+
+```
+git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- ansible/nfs_client_setup.yml
+```
+
+If the docs are newer than the playbook file, re-read both docs with this
+specific workload in mind (not just the general-baseline case each
+underlying role's own check considers) before assuming nothing needs to
+change.
+
 ## What the playbook actually does
 
 Encoded directly in `ansible/nfs_client_setup.yml`'s `vars:` block:

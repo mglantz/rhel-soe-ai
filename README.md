@@ -109,6 +109,23 @@ enforcement by default until explicitly uncommented — see its `SKILL.md`).
 First-class target platform is RHEL-family Linux (RHEL, CentOS Stream,
 Fedora).
 
+## Policy & workload awareness
+
+`docs/POLICY.md` (org-wide policy items) and `docs/WORKLOAD.md` (workloads
+actually hosted on top of this SOE) are living documents every skill
+watches. When either gains a new/changed item more recently than a given
+role's own code was last touched, that role is stale relative to it and
+due for re-assessment:
+
+```sh
+git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- ansible/roles/<domain>/
+```
+
+See `docs/ARCHITECTURE.md`'s "Policy & workload awareness" for the full
+mechanism, and `.claude/skills/soe/SKILL.md` for running the same check
+across every domain at once.
+
 ## How each skill maintains its role
 
 No skill/agent pushes changes to its role directly. Each proposes changes

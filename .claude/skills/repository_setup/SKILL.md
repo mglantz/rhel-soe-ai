@@ -16,6 +16,37 @@ before proposing or explaining how to configure this role — it
 reflects the role's actual current defaults even if a variable summary
 elsewhere in this file has drifted out of sync with the role.
 
+## Policy & workload awareness
+
+`docs/POLICY.md` and `docs/WORKLOAD.md` capture org-wide policy items and
+the workloads this SOE actually hosts — either can gain a new or changed
+item that this role should reflect. Before auditing, remediating, or
+proposing a change, check whether either doc has changed more recently
+than this role's own code:
+
+```
+git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- ansible/roles/repository_setup/
+```
+
+If the docs' latest commit is newer than the role's, this role hasn't been
+re-assessed against current policy/workload — read both files and judge
+whether anything added or changed since is relevant to this domain:
+
+- **Relevant** — propose a concrete change on a branch
+  (`soe/repository_setup/policy-<short-desc>` or
+  `soe/repository_setup/workload-<short-desc>`), same branch + PR workflow as
+  any other role change (see "What to do" above and
+  `docs/ARCHITECTURE.md`'s "Contribution workflow"). Don't wait to be
+  asked.
+- **Not relevant** — say so explicitly (e.g. "checked against
+  `docs/POLICY.md` and `docs/WORKLOAD.md` as of `<date>`, nothing affecting
+  this domain") rather than silently skipping the check.
+
+This check is informational, not a gate — it runs alongside a normal
+audit/remediate, never blocks one; surface the staleness note alongside
+the normal output.
+
 ## What the role actually does
 
 Encoded in `ansible/roles/repository_setup/defaults/main.yml`:
