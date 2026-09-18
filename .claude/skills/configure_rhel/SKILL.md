@@ -10,6 +10,20 @@ Runs `ansible/configure_rhel.yml` — the general host baseline playbook (see
 into the six-playbook layout). This skill is specifically about
 **controlling which of its domains apply for a given run.**
 
+## Policy & workload awareness
+
+Each of this playbook's domains carries its own policy/workload staleness
+check in its own `SKILL.md` (see `docs/ARCHITECTURE.md`'s "Policy &
+workload awareness"). When running a broad `configure_rhel` pass across
+many domains at once, prefer `soe`'s repo-wide scan
+(`.claude/skills/soe/SKILL.md`) over checking each domain one at a time.
+This playbook's own file, and `configure_rhel_domains`'s default list
+specifically, can itself need a change when a new workload or policy item
+implies a domain should move from off-by-default to on-by-default (or vice
+versa) — that's a change to `ansible/configure_rhel.yml` itself, not to any
+one role, so it follows the "cross-cutting change" path in
+`docs/ARCHITECTURE.md`'s contribution workflow, not a single-domain branch.
+
 ## The mechanism
 
 Every one of the 43 in-repo roles this playbook can run is listed as:

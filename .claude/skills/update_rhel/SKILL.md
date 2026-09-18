@@ -12,6 +12,26 @@ Runs `ansible/update_rhel.yml`, a purpose-built playbook pairing the
 each role's own `SKILL.md` for full detail — `system_update_report_pre`
 and `system_update`.
 
+## Policy & workload awareness
+
+This playbook doesn't own an `ansible/roles/<name>/` directory of its
+own — it reuses `system_update_report_pre`, `system_update`, each of which already carries its own
+policy/workload staleness check in its own `SKILL.md` (see
+`docs/ARCHITECTURE.md`'s "Policy & workload awareness"). What's specific to
+*this* playbook is the `update_rhel.yml`-specific variables set directly
+there rather than in any role's own `defaults/main.yml` — check whether
+those need updating too:
+
+```
+git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- ansible/update_rhel.yml
+```
+
+If the docs are newer than the playbook file, re-read both docs with this
+specific workload in mind (not just the general-baseline case each
+underlying role's own check considers) before assuming nothing needs to
+change.
+
 ## What the playbook actually does
 
 Encoded directly in `ansible/update_rhel.yml`'s `vars:` block:

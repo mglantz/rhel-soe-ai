@@ -10,6 +10,13 @@ this one owns no Ansible role under `ansible/roles/` — it's a small,
 self-contained set of ad hoc tasks, not a domain skill's deliverable. See
 `docs/ARCHITECTURE.md` for the six-playbook layout this fits into.
 
+## Policy & workload awareness
+
+This playbook owns no Ansible role (see above) and makes no
+policy-or-workload-driven decisions of its own — connectivity/`become`
+checks don't change based on what `docs/POLICY.md` or `docs/WORKLOAD.md`
+say. Nothing to re-assess here.
+
 ## What the playbook actually does
 
 `hosts: all`, `become: false`, `gather_facts: false` — deliberately

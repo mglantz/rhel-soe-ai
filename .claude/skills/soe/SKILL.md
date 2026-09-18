@@ -15,6 +15,35 @@ playbook(s) for what's being asked, runs it (directly, or filtered by
 shared conventions these roles follow and the rationale for the
 multi-playbook split.
 
+## Policy & workload awareness (repo-wide)
+
+`docs/POLICY.md` and `docs/WORKLOAD.md` capture org-wide policy items and
+the workloads this SOE actually hosts. Every domain skill checks its own
+role for staleness against these two docs individually (see
+`docs/ARCHITECTURE.md`'s "Policy & workload awareness"); this skill can run
+the same check across all 54 in-repo roles at once, as part of (or
+alongside) a full SOE audit:
+
+```
+policy_ts=$(git log -1 --format=%ct -- docs/POLICY.md docs/WORKLOAD.md)
+for d in ansible/roles/*/; do
+  name=$(basename "$d")
+  role_ts=$(git log -1 --format=%ct -- "$d")
+  if [ -n "$role_ts" ] && [ "$policy_ts" -gt "$role_ts" ]; then
+    echo "$name: stale (role last touched $(git log -1 --format=%cI -- "$d"))"
+  fi
+done
+```
+
+Report the resulting list of stale domains alongside the normal audit
+summary — don't silently fold it in or omit it, and don't treat "stale"
+as "broken"; it only means that domain hasn't been read against the
+current `docs/POLICY.md`/`docs/WORKLOAD.md` yet, not that anything is
+actually wrong. For each stale domain the user asks about (or all of
+them, if asked to do a full re-assessment), read both docs and hand off
+to that domain's own skill for the relevance judgment and any proposed
+change.
+
 ## The six playbooks
 
 | Playbook | Purpose | Roles it triggers |

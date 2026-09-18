@@ -233,6 +233,53 @@ a failed task with the `fail_msg` explaining what's wrong, both under
   *is* in the default list in `configure_rhel.yml` even though it reboots
   the host by default — see that role's `SKILL.md`.
 
+## Policy & workload awareness
+
+Two documents at the repo root of `docs/` capture context that cuts across
+every domain, and every skill is expected to notice when either one changes:
+
+- **`docs/POLICY.md`** — org-wide policy items. A new or changed item here
+  can require a change to any number of roles (e.g. a new password-complexity
+  policy affects `accounts_policy`; a new mandatory-logging policy affects
+  `audit_setup`).
+- **`docs/WORKLOAD.md`** — the workloads actually hosted on top of this SOE
+  (web tier, database, load balancer, NFS, etc.), in the same list-of-items
+  format as `POLICY.md`. A new workload can require changes to roles that
+  weren't previously exercised in anger (e.g. adding a database workload
+  might mean `firewall` needs a new port, or `packages_install` needs a new
+  package), or a new purpose-built playbook altogether (see "Playbook
+  layout" above).
+
+**The trigger is staleness relative to git history, not a one-time read.**
+Both docs describe themselves the same way: when an item is added, every
+agent needs to re-assess whether its own subsystem requires a change. In
+practice, "re-assess" means comparing commit timestamps:
+
+```
+git log -1 --format='%cI %h %s' -- docs/POLICY.md docs/WORKLOAD.md
+git log -1 --format='%cI %h %s' -- ansible/roles/<domain>/
+```
+
+If either doc's latest commit is newer than the role's latest commit, that
+role has not been assessed against whatever changed and may be missing
+something — read both docs and judge relevance. A skill finding nothing
+relevant should say so explicitly (e.g. "checked against `docs/POLICY.md`
+and `docs/WORKLOAD.md` as of `<date>`, nothing affecting this domain")
+rather than silently skipping the check; a skill finding something relevant
+proposes a change through the normal branch + PR workflow below, same as
+any other role change, without waiting to be asked.
+
+This check is informational and cheap (two `git log` calls) — it runs
+alongside a normal audit/remediate, never blocks one, and is not itself an
+approval gate. It only surfaces *that* a re-assessment is due and *what*
+changed; the actual judgment of whether it's relevant, and any resulting
+role edit, still goes through the same human-reviewed PR process as
+everything else in this file.
+
+The `soe` orchestrator skill can run this check across every domain at once
+(a repo-wide staleness scan) rather than one role at a time — see
+`.claude/skills/soe/SKILL.md`.
+
 ## Contribution workflow: branch + PR
 
 No skill pushes directly to the default branch. When a skill's agent needs
