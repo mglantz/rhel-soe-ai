@@ -7,3 +7,7 @@ If any items are added in this section, that is a trigger to assess the impact o
 ## Example item
 This is a example policy item which can be ignored.
 
+## PCI DSS 4.0.1 compliance
+The SOE needs to be able to add PCI DSS 4.0.1 compliance for specific systems.
+This policy is described in full in docs/PCI-DSS-v4_0_1.md and needs to be digested.
+
