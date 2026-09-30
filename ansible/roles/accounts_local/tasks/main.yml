@@ -1,4 +1,37 @@
 ---
+- name: Verify local users and groups against PCI DSS
+  vars:
+    pci_users: "{{ accounts_local_users_create | default([], true) | select | list }}"
+    pci_groups: "{{ accounts_local_groups_create | default([], true) | select | list }}"
+    pci_pw_users: "{{ pci_users | selectattr('password', 'defined') | rejectattr('password', 'none') | list }}"
+    pci_max_days: "{{ accounts_local_pci_dss_password_max_days | int }}"
+    pci_expire_bad: "{{ (pci_pw_users | rejectattr('password_expire_max', 'defined') | map(attribute='name') | list)
+                        + (pci_pw_users | selectattr('password_expire_max', 'defined')
+                           | selectattr('password_expire_max', 'gt', pci_max_days | int) | map(attribute='name') | list)
+                        + (pci_pw_users | selectattr('password_expire_max', 'defined')
+                           | selectattr('password_expire_max', 'lt', 1) | map(attribute='name') | list) }}"
+    pci_non_unique: "{{ (pci_users + pci_groups) | selectattr('non_unique', 'defined')
+                        | selectattr('non_unique') | map(attribute='name') | list }}"
+    pci_nopasswd: "{{ pci_users | selectattr('sudo_allow_all', 'defined') | selectattr('sudo_allow_all')
+                      | selectattr('sudo_passwordless', 'defined') | selectattr('sudo_passwordless')
+                      | map(attribute='name') | list }}"
+    pci_weak_hash: "{{ pci_pw_users | rejectattr('password', 'regex', '^!?\\$(6|y|gy)\\$|^[!*]+$')
+                       | map(attribute='name') | list if accounts_local_password_encrypted else [] }}"
+  ansible.builtin.assert:
+    that:
+      - pci_expire_bad | length == 0
+      - pci_non_unique | length == 0
+      - pci_nopasswd | length == 0
+      - pci_weak_hash | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      password_expire_max missing or not 1-{{ pci_max_days }} (8.3.9): {{ pci_expire_bad }};
+      non_unique UID/GID (8.2.1): {{ pci_non_unique }};
+      passwordless sudo (8.2.2/8.3.1): {{ pci_nopasswd }};
+      password hash not SHA-512/yescrypt (8.3.2): {{ pci_weak_hash }}
+  when: accounts_local_pci_dss | bool
+
 # https://github.com/ansible/ansible/issues/86199
 # https://github.com/ansible/ansible/issues/86218
 - name: Delete local user
