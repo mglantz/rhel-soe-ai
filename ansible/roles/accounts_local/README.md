@@ -72,6 +72,21 @@ accounts_local_users_groups:
 #      - tcpdump
 #      - wheel
 #    append: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if
+# the requested users/groups conflict with Requirement 8:
+#  - users with a managed password must set
+#    password_expire_max between 1 and
+#    accounts_local_pci_dss_password_max_days (8.3.9)
+#  - non_unique UIDs/GIDs are not allowed (8.2.1)
+#  - sudo_allow_all with sudo_passwordless is not
+#    allowed (8.2.2, 8.3.1)
+#  - with accounts_local_password_encrypted, password
+#    hashes must be SHA-512 or yescrypt (8.3.2)
+accounts_local_pci_dss: false
+accounts_local_pci_dss_password_max_days: 90
 </pre>
 
 ## License
