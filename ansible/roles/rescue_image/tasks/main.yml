@@ -1,4 +1,14 @@
 ---
+- name: Verify rescue image configuration against PCI DSS
+  ansible.builtin.assert:
+    that: not rescue_image_enable | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation (6.3.3, 2.2.4) - the rescue kernel is built once and never
+      updated, leaving an unpatched kernel bootable from the boot menu;
+      rescue_image_enable must be false on an in-scope host
+  when: rescue_image_pci_dss | bool
+
 - name: Enable rescue image
   ansible.builtin.include_tasks: enable.yml
   when: rescue_image_enable | bool
@@ -6,3 +16,4 @@
 - name: Disable rescue image
   ansible.builtin.include_tasks: disable.yml
   when: not rescue_image_enable | bool
+
