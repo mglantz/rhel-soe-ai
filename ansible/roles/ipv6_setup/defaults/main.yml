@@ -13,3 +13,14 @@ ipv6_setup_loopback_persist: false
 # Set to true to configure NetworkManager/IPv6 with this role
 # When using system_roles.network to configure NM set to false
 ipv6_setup_configure_nm: true
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if
+# IPv6 is enabled without being documented as necessary:
+# only necessary protocols may be enabled (2.2.4). Either
+# set ipv6_setup_enable: false or, when IPv6 is required,
+# set ipv6_setup_pci_dss_ipv6_required: true and record the
+# business need in the system configuration standard
+ipv6_setup_pci_dss: false
+ipv6_setup_pci_dss_ipv6_required: false
