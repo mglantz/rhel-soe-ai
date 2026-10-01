@@ -11,6 +11,8 @@
       [main]
       rc-manager=unmanaged
     dest: /etc/NetworkManager/conf.d/90-rc-manager.conf
+    owner: root
+    group: root
     mode: '0644'
   register: nm_rc_manager_config
 
@@ -36,4 +38,6 @@
   ansible.builtin.copy:
     content: "{{ etc_resolv_conf_content }}"
     dest: /etc/resolv.conf
+    owner: root
+    group: root
     mode: '0644'
