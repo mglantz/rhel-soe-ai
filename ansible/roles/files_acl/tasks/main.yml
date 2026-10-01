@@ -1,4 +1,32 @@
 ---
+- name: Verify ACLs against PCI DSS
+  vars:
+    pci_acls: "{{ files_acl | default([], true) | select | list }}"
+    pci_regex: "^({{ files_acl_pci_dss_log_paths | map('regex_escape') | join('|') }})(/|$)"
+    pci_log: "{{ ((pci_acls | rejectattr('state', 'defined') | list)
+                  + (pci_acls | selectattr('state', 'defined') | selectattr('state', 'eq', 'present') | list))
+                 | selectattr('path', 'match', pci_regex)
+                 | selectattr('etype', 'defined') | rejectattr('etype', 'eq', 'mask')
+                 | selectattr('permissions', 'defined') | list }}"
+    pci_write: "{{ pci_log | selectattr('permissions', 'search', 'w') | map(attribute='path') | unique | list }}"
+    pci_other: "{{ pci_log | selectattr('etype', 'eq', 'other') | selectattr('permissions', 'search', 'r')
+                   | map(attribute='path') | unique | list }}"
+    pci_readers: "{{ pci_log | selectattr('etype', 'in', ['user', 'group']) | selectattr('entity', 'defined')
+                     | rejectattr('entity', 'in', files_acl_pci_dss_log_readers + ['', 'root'])
+                     | selectattr('permissions', 'search', 'r') | map(attribute='entity') | unique | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_write | length == 0
+      - pci_other | length == 0
+      - pci_readers | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      write ACL on audit log path (10.3.2): {{ pci_write }};
+      read ACL for other on audit log path (10.3.1): {{ pci_other }};
+      audit log readers not in files_acl_pci_dss_log_readers (10.3.1): {{ pci_readers }}
+  when: files_acl_pci_dss | bool
+
 - name: Install required packages
   ansible.builtin.dnf:
     name: acl
