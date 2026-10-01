@@ -1,4 +1,33 @@
 ---
+- name: Verify downloads against PCI DSS
+  vars:
+    pci_files: "{{ files_get | default([], true) | select | list }}"
+    pci_nocert: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.validate_certs is defined -%}
+      {%-   if not (f.validate_certs | bool) -%}{%- set _ = out.append(f.url) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+    pci_cleartext: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.url_username is defined or f.url_password is defined -%}
+      {%-   if not (f.url | string | lower).startswith('https://') -%}{%- set _ = out.append(f.url) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+    pci_logged: "{{ pci_files | selectattr('url_password', 'defined') | list | length > 0 and not files_get_no_log | bool }}"
+  ansible.builtin.assert:
+    that:
+      - pci_nocert | length == 0
+      - pci_cleartext | length == 0
+      - not pci_logged
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      certificate validation disabled (4.2.1): {{ pci_nocert }};
+      credentials sent without TLS (8.3.2): {{ pci_cleartext }};
+      credentials logged, files_get_no_log is false (8.3.2): {{ pci_logged }}
+  when: files_get_pci_dss | bool
+
 - name: Get files
   vars:
     passwords_used: "{{ files_get | selectattr('url_password', 'defined') | length > 0 }}"
