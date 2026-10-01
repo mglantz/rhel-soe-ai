@@ -1,4 +1,69 @@
 ---
+- name: Verify properties against PCI DSS
+  vars:
+    pci_all: "{{ files_properties | default([], true) | select | list }}"
+    pci_files: "{{ pci_all | rejectattr('state', 'defined') | list
+                   + pci_all | selectattr('state', 'defined') | rejectattr('state', 'eq', 'absent') | list }}"
+    pci_regex: "^({{ files_properties_pci_dss_log_paths | map('regex_escape') | join('|') }})(/|$)"
+    pci_owners: "{{ files_properties_pci_dss_log_owners + ['0', 0] }}"
+    pci_modes: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.mode is defined -%}
+      {%-   set m = ('%o' | format(f.mode)) if f.mode is number else (f.mode | string) -%}
+      {%-   set ns = namespace(other=false, ww=false, gw=false, sticky=false) -%}
+      {%-   if m is match('^[0-7]+$') -%}
+      {%-     set ns.other = m[-1] != '0' -%}
+      {%-     set ns.ww = m[-1] in '2367' -%}
+      {%-     set ns.gw = (m | length) >= 2 and m[-2] in '2367' -%}
+      {%-     set ns.sticky = (m | length) >= 4 and m[-4] in '1357' -%}
+      {%-   else -%}
+      {%-     for c in m.split(',') -%}
+      {%-       set who = c | regex_replace('[-+=].*$', '') -%}
+      {%-       for op in c[who | length:] | regex_findall('[-+=][rwxXstugo]*') if op[0] != '-' -%}
+      {%-         set perms = op[1:] -%}
+      {%-         if who == '' or 'o' in who or 'a' in who -%}
+      {%-           if perms is search('[rwxX]') -%}{%- set ns.other = true -%}{%- endif -%}
+      {%-           if 'w' in perms -%}{%- set ns.ww = true -%}{%- endif -%}
+      {%-         endif -%}
+      {%-         if (who == '' or 'g' in who or 'a' in who) and 'w' in perms -%}{%- set ns.gw = true -%}{%- endif -%}
+      {%-         if 't' in perms -%}{%- set ns.sticky = true -%}{%- endif -%}
+      {%-       endfor -%}
+      {%-     endfor -%}
+      {%-   endif -%}
+      {%-   set _ = out.append({'path': f.path, 'log': f.path is match(pci_regex), 'other': ns.other,
+                                'gw': ns.gw, 'ww': ns.ww and not (f.state | default('') == 'directory' and ns.sticky)}) -%}
+      {%- endfor -%}
+      {{ out }}
+    pci_world: "{{ pci_modes | selectattr('ww') | map(attribute='path') | unique | list }}"
+    pci_log: "{{ pci_files | selectattr('path', 'match', pci_regex) | list }}"
+    pci_log_other: "{{ pci_modes | selectattr('log') | selectattr('other') | map(attribute='path') | unique | list }}"
+    pci_log_gw: "{{ pci_modes | selectattr('log') | selectattr('gw') | map(attribute='path') | unique | list }}"
+    pci_log_owner: "{{ (pci_log | selectattr('owner', 'defined') | rejectattr('owner', 'in', pci_owners) | list
+                        + pci_log | selectattr('group', 'defined') | rejectattr('group', 'in', pci_owners) | list)
+                       | map(attribute='path') | unique | list }}"
+    pci_log_attr: "{{ pci_log | selectattr('attributes', 'defined') | selectattr('attributes', 'match', '^-.*[ai]')
+                      | map(attribute='path') | unique | list }}"
+    pci_log_link: "{{ pci_log | selectattr('state', 'defined') | selectattr('state', 'in', ['link', 'hard'])
+                      | map(attribute='path') | unique | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_world | length == 0
+      - pci_log_other | length == 0
+      - pci_log_gw | length == 0
+      - pci_log_owner | length == 0
+      - pci_log_attr | length == 0
+      - pci_log_link | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      world-writable mode (2.2.6, 10.3.2): {{ pci_world }};
+      other access on audit log path (10.3.1, 10.3.2): {{ pci_log_other }};
+      group write on audit log path (10.3.2): {{ pci_log_gw }};
+      audit log owner/group not in files_properties_pci_dss_log_owners (10.3.1, 10.3.2): {{ pci_log_owner }};
+      append-only/immutable attribute removed from audit log path (10.3.2): {{ pci_log_attr }};
+      audit log path replaced by link (10.3.2): {{ pci_log_link }}
+  when: files_properties_pci_dss | bool
+
 - name: Install required packages
   ansible.builtin.dnf:
     name: e2fsprogs

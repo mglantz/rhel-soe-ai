@@ -8,3 +8,24 @@ files_properties:
 #    owner: root
 #    group: root
 #    mode: '0600'
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if an
+# entry in files_properties would:
+#  - set a world-writable mode on any path (2.2.6, 10.3.2);
+#    directories with the sticky bit set (e.g. '1777') are allowed
+# or, for a path under files_properties_pci_dss_log_paths:
+#  - grant any access to other (10.3.1, 10.3.2)
+#  - grant write to group (10.3.2)
+#  - set owner or group to one not listed in
+#    files_properties_pci_dss_log_owners (10.3.1, 10.3.2)
+#  - remove the append-only (a) or immutable (i) attribute (10.3.2)
+#  - set state link or hard, replacing the log file (10.3.2)
+# Tightening permissions on audit logs is allowed.
+files_properties_pci_dss: false
+files_properties_pci_dss_log_paths:
+  - /var/log
+  - /run/log
+files_properties_pci_dss_log_owners:
+  - root
