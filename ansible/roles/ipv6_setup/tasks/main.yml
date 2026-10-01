@@ -1,4 +1,15 @@
 ---
+- name: Verify IPv6 state against PCI DSS
+  ansible.builtin.assert:
+    that: not ipv6_setup_enable | bool or ipv6_setup_pci_dss_ipv6_required | bool
+    quiet: true
+    fail_msg: >-
+      IPv6 is enabled but not documented as necessary on this
+      PCI DSS in-scope system (2.2.4). Set ipv6_setup_enable: false,
+      or set ipv6_setup_pci_dss_ipv6_required: true and record the
+      business need in the system configuration standard
+  when: ipv6_setup_pci_dss | bool
+
 - name: Gather package facts
   ansible.builtin.package_facts:
 
