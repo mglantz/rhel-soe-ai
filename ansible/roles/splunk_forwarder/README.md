@@ -30,6 +30,18 @@ splunk_forwarder_package_state: present
 # to use if not using the role provided defaults
 splunk_deployment_config_file:
 splunk_user_config_file:
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if:
+#  - splunk_deployment_server is unset, so logs would
+#    not reach a central log server (10.3.3)
+#  - splunk_deployment_server_check is false, so the
+#    central log path is not verified (10.3.3, 10.7.2)
+#  - with the role provided user-seed.conf template,
+#    splunk_user_password_hash is unset or not a
+#    SHA-512 crypt hash ($6$) (2.2.2, 8.3.2, 8.6.2)
+splunk_forwarder_pci_dss: false
 </pre>
 
 ## License
