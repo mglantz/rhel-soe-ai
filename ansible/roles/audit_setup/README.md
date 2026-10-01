@@ -18,6 +18,8 @@ Below are the role default values from defaults/main.yml:
 audit_setup_config_file:
 
 # Optional audit rules file to copy
+# Role provided alternatives:
+# * audit_pci.rules        - PCI DSS 4.0.1 Requirement 10.2 rules
 audit_setup_rules_file:
 
 # Action with locked rules if rules changed
@@ -34,6 +36,25 @@ audit_setup_exclusive: false
 # NB. This list must be updated for use with OpenSCAP!
 audit_setup_files_known:
   - /etc/audit/rules.d/audit.rules
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change unless
+# audit_setup_config_file and audit_setup_rules_file are set
+# and the selected files meet Requirement 10:
+#  - auditd.conf write_logs and local_events not "no" (10.2.1)
+#  - auditd.conf space_left_action, admin_space_left_action,
+#    disk_full_action and disk_error_action not "ignore",
+#    failures must be detected (10.7.2)
+#  - the rules file does not disable auditing (-e 0) and
+#    covers execve as root (10.2.1.2), /var/log/audit
+#    (10.2.1.3), passwd/shadow/group/gshadow/sudoers
+#    (10.2.1.5) and /etc/audit (10.2.1.6)
+# All role-provided auditd.conf files pass, audit_pci.rules
+# passes. Rules files not managed by this role still apply,
+# consider audit_setup_exclusive. Retention and central
+# log forwarding (10.3.3, 10.5.1) are not handled here.
+audit_setup_pci_dss: false
 </pre>
 
 ## License
