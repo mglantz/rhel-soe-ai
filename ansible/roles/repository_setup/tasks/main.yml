@@ -1,4 +1,26 @@
 ---
+- name: Verify repository configuration against PCI DSS
+  vars:
+    pci_params: "{{ repository_setup_rhsm_parameters | default({}, true) }}"
+    pci_curl_args: "{{ repository_setup_rhsm_curl_args | default('', true) }}"
+  ansible.builtin.assert:
+    that:
+      - repository_setup_rhsm_subscribe | bool
+      - not pci_params.server_insecure | default(false) | bool
+      - pci_curl_args is not regex('(^|\\s)(-[a-zA-Z]*k[a-zA-Z]*|--insecure)(\\s|$)')
+      - not (repository_setup_install_katello_rpm | bool and pci_params.rhsm_baseurl is defined
+             and pci_curl_args | length == 0)
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation (6.3.3) - an in-scope host needs a trusted patch source:
+      repository_setup_rhsm_subscribe must be true, server_insecure must be false,
+      repository_setup_rhsm_curl_args must not use -k/--insecure, and
+      repository_setup_install_katello_rpm must be false (it skips GPG and TLS checks;
+      deploy the Satellite CA with the certificates role instead)
+  when:
+    - repository_setup_pci_dss | bool
+    - repository_setup_rhsm_configure | bool
+
 - name: Copy repository configuration files
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -23,3 +45,38 @@
   when:
     - repository_setup_rhsm_configure | bool
     - not repository_setup_rhsm_subscribe | bool
+
+- name: Check enabled repositories for PCI DSS
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_facts.discovered_interpreter_python | default('/usr/bin/python3') }}"
+      - -c
+      - |
+        import json, dnf
+        base = dnf.Base()
+        base.conf.substitutions.update_from_etc('/')
+        base.read_all_repos()
+        print(json.dumps([{'id': r.id, 'gpgcheck': bool(r.gpgcheck), 'sslverify': bool(r.sslverify)}
+                          for r in base.repos.iter_enabled()]))
+  register: repository_setup_pci_repos
+  changed_when: false
+  check_mode: false
+  when: repository_setup_pci_dss | bool
+
+- name: Verify enabled repositories against PCI DSS
+  vars:
+    pci_repos: "{{ repository_setup_pci_repos.stdout | from_json }}"
+    pci_no_gpg: "{{ pci_repos | rejectattr('gpgcheck') | map(attribute='id') | list }}"
+    pci_no_ssl: "{{ pci_repos | rejectattr('sslverify') | map(attribute='id') | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_repos | length > 0
+      - pci_no_gpg | length == 0
+      - pci_no_ssl | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations (6.3.3) -
+      enabled repositories: {{ pci_repos | length }} (must be at least 1);
+      gpgcheck off: {{ pci_no_gpg }};
+      sslverify off: {{ pci_no_ssl }}
+  when: repository_setup_pci_dss | bool

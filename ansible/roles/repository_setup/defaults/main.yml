@@ -85,3 +85,21 @@ repository_setup_rhsm_repositories_enable:
 
 # Disable non-enabled Red Hat / Satellite repositories
 repository_setup_rhsm_repositories_purge: true
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# Requirement 6.3.3 needs a working, trusted source of
+# security patches. When true, the role fails before
+# making any change if RHSM is configured and:
+#  - repository_setup_rhsm_subscribe is false
+#  - server_insecure is true
+#  - repository_setup_rhsm_curl_args disables TLS
+#    verification (-k or --insecure)
+#  - the katello-ca-consumer RPM would be installed,
+#    which skips GPG and TLS checks. Deploy the
+#    Satellite CA with the certificates role and set
+#    repository_setup_install_katello_rpm to false
+# After all changes, the role fails if the host has no
+# enabled repositories, or if any enabled repository has
+# gpgcheck or sslverify turned off.
+repository_setup_pci_dss: false
