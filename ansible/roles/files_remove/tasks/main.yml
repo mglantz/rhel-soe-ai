@@ -45,6 +45,29 @@
     label: "{{ item.files | map(attribute='path') }}"
   when: item.files | length > 0
 
+- name: Verify removals against PCI DSS
+  vars:
+    pci_paths: "{{ (files_remove | select | reject('search', '\\?|\\*|\\[') | list + glob_paths)
+                   | reject('in', files_remove_exclude | select) | unique | list }}"
+    pci_regex: "^({{ files_remove_pci_dss_log_paths | map('regex_escape') | join('|') }})(/|$)"
+    pci_log: >-
+      {%- set out = [] -%}
+      {%- for p in pci_paths -%}
+      {%-   set parent = p | regex_replace('/+$', '') ~ '/' -%}
+      {%-   if p is match(pci_regex) or files_remove_pci_dss_log_paths
+                                        | select('match', parent | regex_escape) | list -%}
+      {%-     set _ = out.append(p) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
+  ansible.builtin.assert:
+    that: pci_log | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      removal of or above audit log path (10.3.2, 10.5.1): {{ pci_log }}
+  when: files_remove_pci_dss | bool
+
 - name: Remove files and directories
   vars:
     plain_paths: "{{ files_remove | select | reject('search', '\\?|\\*|\\[') }}"
