@@ -1,4 +1,28 @@
 ---
+- name: Verify firewall configuration against PCI DSS
+  vars:
+    pci_services: "{{ firewall_open_services | default([], true) | select | list }}"
+    pci_ports: "{{ firewall_open_ports | default([], true) | select | map('string') | map('lower') | list }}"
+    pci_bad_services: "{{ pci_services | intersect(firewall_pci_dss_insecure_services) }}"
+    pci_bad_ports: "{{ pci_ports | intersect(firewall_pci_dss_insecure_ports) }}"
+  ansible.builtin.assert:
+    that:
+      - firewall_enable is not none
+      - firewall_enable | bool
+      - firewall_close_unconfigured | bool
+      - firewall_default_zone != 'trusted'
+      - pci_bad_services | length == 0
+      - pci_bad_ports | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      firewall_enable must be true (1.2.1/1.3.1): {{ firewall_enable }};
+      firewall_close_unconfigured must be true (1.2.5/1.3.1): {{ firewall_close_unconfigured }};
+      default zone must not be trusted (1.3.1/1.4.2): {{ firewall_default_zone }};
+      insecure services opened (1.2.6/2.2.5): {{ pci_bad_services }};
+      insecure ports opened (1.2.6/2.2.5): {{ pci_bad_ports }}
+  when: firewall_pci_dss | bool
+
 - name: Enable firewall
   ansible.builtin.include_tasks: enable.yml
   when:

@@ -32,6 +32,32 @@ firewall_open_services:
 # The ssh service will not be closed by
 # this role regardless of configuration
 firewall_close_unconfigured: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if
+# the requested configuration conflicts with Requirement 1:
+#  - firewall_enable must be true, the host firewall must
+#    be enforced and managed (1.2.1, 1.3.1)
+#  - firewall_close_unconfigured must be true, so that
+#    traffic not explicitly allowed is denied (1.2.5, 1.3.1)
+#  - firewall_default_zone must not be trusted, which
+#    accepts all traffic (1.3.1, 1.4.2)
+#  - firewall_open_services and firewall_open_ports must
+#    not include insecure cleartext services (1.2.6, 2.2.5)
+firewall_pci_dss: false
+firewall_pci_dss_insecure_services:
+  - ftp
+  - rsh
+  - telnet
+  - tftp
+firewall_pci_dss_insecure_ports:
+  - 21/tcp
+  - 23/tcp
+  - 69/udp
+  - 512/tcp
+  - 513/tcp
+  - 514/tcp
 </pre>
 
 ## License
