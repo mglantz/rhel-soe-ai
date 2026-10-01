@@ -184,3 +184,86 @@
     - ansible_facts.virtualization_type in ['kvm', 'VirtualPC', 'VMware']
     - agent_services[ansible_facts.virtualization_type] in ansible_facts.services
     - guest_agent_enable | bool
+
+- name: Restrict QEMU guest agent RPCs
+  when:
+    - guest_agent_pci_dss | bool
+    - ansible_facts.system_vendor != "Nutanix"
+    - ansible_facts.virtualization_role == "guest"
+    - ansible_facts.virtualization_type == "kvm"
+    - guest_agent_enable | bool
+  block:
+    - name: Read QEMU guest agent settings
+      ansible.builtin.slurp:
+        src: /etc/sysconfig/qemu-ga
+      register: guest_agent_qemu_ga
+      # Not present yet in check mode before install
+      failed_when: false
+
+    - name: Find QEMU guest agent RPC filter
+      vars:
+        qga_lines: "{{ guest_agent_qemu_ga.content | b64decode | split('\n') }}"
+        qga_pattern: '^(FILTER_RPC_ARGS="?--(allow|block)-rpcs=|BLACKLIST_RPC=|BLOCK_RPCS=)'
+      ansible.builtin.set_fact:
+        guest_agent_qemu_ga_filter_line: "{{ qga_lines | select('match', qga_pattern) | first | default('') }}"
+      when: guest_agent_qemu_ga.content is defined
+
+    - name: Verify QEMU guest agent RPC filter was found
+      ansible.builtin.assert:
+        that: guest_agent_qemu_ga_filter_line != ''
+        quiet: true
+        fail_msg: >-
+          No RPC allow or block list found in /etc/sysconfig/qemu-ga,
+          cannot apply PCI DSS RPC restrictions (2.2.4)
+      when: guest_agent_qemu_ga.content is defined
+
+    - name: Update QEMU guest agent RPC filter
+      vars:
+        qga_prefix: "{{ guest_agent_qemu_ga_filter_line | regex_replace('^([A-Z_]+=\"?(--[a-z]+-rpcs=)?).*$', '\\1') }}"
+        qga_suffix: "{{ '\"' if '\"' in qga_prefix else '' }}"
+        qga_rpcs: >-
+          {{ guest_agent_qemu_ga_filter_line[qga_prefix | length:] | replace('"', '') | trim
+             | split(',') | select | list }}
+        qga_new_rpcs: >-
+          {{ qga_rpcs | reject('in', guest_agent_pci_dss_qemu_blocked_rpcs) | list
+             if '--allow-rpcs=' in qga_prefix else
+             qga_rpcs + (guest_agent_pci_dss_qemu_blocked_rpcs | reject('in', qga_rpcs) | list) }}
+      ansible.builtin.lineinfile:
+        path: /etc/sysconfig/qemu-ga
+        regexp: "^{{ qga_prefix | regex_escape }}"
+        line: "{{ qga_prefix }}{{ qga_new_rpcs | join(',') }}{{ qga_suffix }}"
+      register: guest_agent_qemu_ga_filter
+      when: guest_agent_qemu_ga.content is defined
+
+    - name: Restart QEMU guest agent service
+      ansible.builtin.service:
+        name: qemu-guest-agent.service
+        state: restarted
+      when:
+        - guest_agent_qemu_ga_filter is changed
+        - ansible_facts.services['qemu-guest-agent.service'].state | default('') == 'running'
+
+- name: Restrict VMware guest operations
+  when:
+    - guest_agent_pci_dss | bool
+    - ansible_facts.virtualization_role == "guest"
+    - ansible_facts.virtualization_type == "VMware"
+    - guest_agent_enable | bool
+  block:
+    - name: Disable VMware guest operations
+      community.general.ini_file:
+        path: /etc/vmware-tools/tools.conf
+        section: guestoperations
+        option: disabled
+        value: 'true'
+        create: true
+        mode: '0644'
+      register: guest_agent_vmtools_conf
+
+    - name: Restart VMware guest agent service
+      ansible.builtin.service:
+        name: vmtoolsd.service
+        state: restarted
+      when:
+        - guest_agent_vmtools_conf is changed
+        - ansible_facts.services['vmtoolsd.service'].state | default('') == 'running'
