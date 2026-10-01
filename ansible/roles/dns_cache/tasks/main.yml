@@ -19,3 +19,36 @@
   when:
     - dns_cache_enable | bool
     - dns_cache_component == 'systemd-resolved'
+
+- name: Find DNS cache listening sockets
+  ansible.builtin.command: ss -Hlnptu
+  register: dns_cache_pci_sockets
+  changed_when: false
+  check_mode: false
+  when: dns_cache_pci_dss | bool
+
+- name: Display DNS cache listening sockets
+  vars:
+    pci_listeners: "{{ dns_cache_pci_sockets.stdout_lines
+                       | select('search', '\"(dnsmasq|systemd-resolve)\"')
+                       | map('split') | map(attribute='4') | sort | list }}"
+  ansible.builtin.debug:
+    msg: "{{ pci_listeners | default(['no DNS cache listening sockets'], true) }}"
+  when: dns_cache_pci_dss | bool
+
+- name: Verify DNS cache listens only on loopback
+  vars:
+    pci_exposed: "{{ dns_cache_pci_sockets.stdout_lines
+                     | select('search', '\"(dnsmasq|systemd-resolve)\"')
+                     | map('split') | map(attribute='4')
+                     | reject('match', '(127\\.|\\[::1\\]|::1)')
+                     | unique | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_exposed | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      DNS cache sockets bound to an address other than
+      loopback (1.2.5, 2.2.4): {{ pci_exposed }}
+  when: dns_cache_pci_dss | bool
