@@ -35,6 +35,18 @@ files_remove_recursive: false
 # Useful with globbing, optional to use
 files_remove_exclude:
 #  - /etc/some/confdir/base.conf
+
+# PCI DSS 4.0.1 guardrails, enable on in-scope systems.
+# Before anything is removed, fail if a path to be
+# removed (literal or after glob expansion, minus
+# files_remove_exclude) is under or is a parent of
+# one of files_remove_pci_dss_log_paths:
+#  - audit logs are protected from modification (10.3.2)
+#  - audit log history is retained (10.5.1)
+files_remove_pci_dss: false
+files_remove_pci_dss_log_paths:
+  - /var/log
+  - /run/log
 </pre>
 
 ## License
