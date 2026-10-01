@@ -7,6 +7,17 @@
       - distribution_major_version
   when: ansible_facts.distribution_major_version is not defined
 
+- name: Verify certificate configuration against PCI DSS
+  ansible.builtin.assert:
+    that:
+      - certificates_exclusive | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      certificates_exclusive enabled, so only declared
+      anchors are trusted (4.2.1): {{ certificates_exclusive | bool }}
+  when: certificates_pci_dss | bool
+
 - name: Copy certificate anchor files
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -59,3 +70,46 @@
   changed_when: true
   when: (anchor_files is changed or blocklist_files is changed or ext_files is changed) or
         (certificates_exclusive | bool and remove_files is changed)
+
+- name: Inventory local trusted certificates
+  ansible.builtin.shell:
+    cmd: |
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
+      for f in /etc/pki/ca-trust/source/anchors/* /etc/pki/ca-trust/source/*; do
+        [ -f "$f" ] || continue
+        case $f in */source/README|*/source/ca-bundle.legacy.crt) continue ;; esac
+        rm -f "$tmp"/c*
+        awk -v d="$tmp" '/^-----BEGIN (TRUSTED )?CERTIFICATE-----/ { n++ }
+                         n { print > (d "/c" n) }' "$f"
+        [ -e "$tmp/c1" ] || openssl x509 -inform DER -in "$f" -out "$tmp/c1" 2> /dev/null || rm -f "$tmp/c1"
+        [ -e "$tmp/c1" ] || { printf '%s|-|-|-|unparsed\n' "$f"; continue; }
+        for c in "$tmp"/c*; do
+          subject=$(openssl x509 -in "$c" -noout -subject -nameopt RFC2253 | sed 's/^subject=//')
+          issuer=$(openssl x509 -in "$c" -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')
+          enddate=$(openssl x509 -in "$c" -noout -enddate | sed 's/^notAfter=//')
+          if openssl x509 -in "$c" -noout -checkend 0 > /dev/null; then state=valid; else state=EXPIRED; fi
+          printf '%s|%s|%s|%s|%s\n' "$f" "$subject" "$issuer" "$enddate" "$state"
+        done
+      done
+  register: certificates_inventory
+  changed_when: false
+  check_mode: false
+  when: certificates_pci_dss | bool
+
+- name: Display local trusted certificate inventory
+  ansible.builtin.debug:
+    msg: "{{ certificates_inventory.stdout_lines | default(['no local trusted certificates'], true) }}"
+  when: certificates_pci_dss | bool
+
+- name: Verify local trusted certificates have not expired
+  vars:
+    pci_expired: "{{ certificates_inventory.stdout_lines | select('search', '\\|EXPIRED$') | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_expired | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      expired trusted certificates (4.2.1): {{ pci_expired }}
+  when: certificates_pci_dss | bool
