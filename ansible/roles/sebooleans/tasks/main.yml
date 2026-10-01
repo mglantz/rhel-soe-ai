@@ -1,4 +1,21 @@
 ---
+- name: Verify SELinux booleans against PCI DSS
+  vars:
+    pci_justified: "{{ sebooleans_pci_dss_exceptions | default({}, true) | dict2items
+                       | selectattr('value', 'string') | rejectattr('value', 'match', '^\\s*$')
+                       | map(attribute='key') | list }}"
+    pci_denied: "{{ sebooleans_enable | default([], true) | select
+                    | intersect(sebooleans_pci_dss_denied | default([], true))
+                    | difference(pci_justified) }}"
+  ansible.builtin.assert:
+    that: pci_denied | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - SELinux booleans weakening protections
+      enabled without documented justification in
+      sebooleans_pci_dss_exceptions (2.2.4/2.2.5/2.2.6): {{ pci_denied }}
+  when: sebooleans_pci_dss | bool
+
 - name: Install required packages
   vars:
     required_packages:
@@ -28,7 +45,8 @@
   loop: "{{ sebooleans_disable | select }}"
   when:
     - item + ' ' in sebooleans_known.stdout or
-      not sebooleans_skip_missing | bool
+      not sebooleans_skip_missing | bool or
+      sebooleans_pci_dss | bool
     - item not in sebooleans_enable | select
 
 - name: Enable SELinux booleans
@@ -40,4 +58,5 @@
   loop: "{{ sebooleans_enable | select }}"
   when:
     - item + ' ' in sebooleans_known.stdout or
-      not sebooleans_skip_missing | bool
+      not sebooleans_skip_missing | bool or
+      sebooleans_pci_dss | bool
