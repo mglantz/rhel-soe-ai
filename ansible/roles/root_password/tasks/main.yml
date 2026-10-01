@@ -1,10 +1,34 @@
 ---
+- name: Verify root password against PCI DSS
+  vars:
+    pw_string: "{{ root_password | string }}"
+    pci_weak_hash: "{{ root_password_encrypted | bool and pw_string is not regex('^!?\\$(6|y|gy)\\$|^[!*]+$') }}"
+    pci_weak_clear: "{{ not root_password_encrypted | bool
+                        and (pw_string | length < root_password_pci_dss_min_length | int
+                             or pw_string is not regex('[A-Za-z]')
+                             or pw_string is not regex('[0-9]')) }}"
+  ansible.builtin.assert:
+    that:
+      - not pci_weak_hash | bool
+      - not pci_weak_clear | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation for root_password (value not shown) -
+      {{ 'hash is not SHA-512/yescrypt (8.3.2)' if pci_weak_hash | bool
+         else 'cleartext is shorter than ' ~ root_password_pci_dss_min_length
+              ~ ' characters or lacks letters and digits (8.3.6)' }}
+  when:
+    - root_password_pci_dss | bool
+    - root_password is defined
+    - root_password is not none
+    - root_password | length > 0
+
 - name: Update root password
   vars:
     salt_seed: "{{ root_password_salt_seed }}"
     salt_rand: "{{ 1234567890 | random(start=1000000000, seed=salt_seed) | string }}"
     rand_salt: "{{ ((salt_rand + inventory_hostname) | hash('sha512'))[:16] }}"
-    encrypted: "{{ root_password_encrypted }}"
+    encrypted: "{{ root_password_encrypted | bool }}"
     pw_string: "{{ root_password | string }}"
     pw_encrypted: "{{ pw_string if encrypted else pw_string | password_hash('sha512', rand_salt) }}"
   no_log: true
