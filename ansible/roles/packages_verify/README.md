@@ -33,6 +33,37 @@ packages_verify_check_content: true
 
 # Fail role on changed packages
 packages_verify_fail_content: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, verification runs even if packages_verify_enable
+# is false, packages_verify_pci_dss_packages are verified in
+# addition to packages_verify (an empty packages_verify still
+# means all packages), and the role fails if any non-config
+# file owned by a verified package was changed or deleted
+# (11.5.2). Changes to %config files are reported only.
+# rpm -V does not detect added files and does not schedule
+# or alert by itself: run the role at least weekly and alert
+# on failure, or use a dedicated FIM tool such as AIDE.
+packages_verify_pci_dss: false
+packages_verify_pci_dss_packages:
+  - audit
+  - bash
+  - coreutils
+  - crypto-policies
+  - glibc
+  - kernel-core
+  - openssh-clients
+  - openssh-server
+  - openssl-libs
+  - pam
+  - policycoreutils
+  - rpm
+  - selinux-policy
+  - shadow-utils
+  - sudo
+  - systemd
+  - util-linux
 </pre>
 
 ## License
