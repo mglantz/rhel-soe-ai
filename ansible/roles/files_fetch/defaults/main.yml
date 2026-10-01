@@ -9,3 +9,21 @@ files_fetch:
 #    dest: /tmp/log-{{ inventory_hostname }}.txt
 #    flat: true
 #    validate_checksum: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before fetching anything if an
+# entry in files_fetch would:
+#  - copy a src matching files_fetch_pci_dss_deny_regex to the
+#    control node: password hashes, private keys and other
+#    secrets (3.6.1.4, 8.3.2)
+#  - set validate_checksum: false, so a fetched copy (e.g. an
+#    audit log) is not verified against the source (10.3.4)
+files_fetch_pci_dss: false
+files_fetch_pci_dss_deny_regex:
+  - '^/etc/g?shadow-?$'
+  - '^/etc/security/opasswd$'
+  - '^/etc/pki/tls/private(/|$)'
+  - '^/etc/ssh/ssh_host_[^/]*_key$'
+  - '^/root/\.ssh(/|$)'
+  - '^/home/[^/]+/\.ssh(/|$)'
