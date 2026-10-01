@@ -1,7 +1,25 @@
 ---
+- name: Verify package removal against PCI DSS
+  vars:
+    pci_packages: "{{ packages_remove_pci_dss_packages | select
+                      | difference(packages_remove_pci_dss_justified | select) }}"
+    pci_kept: "{{ pci_packages | intersect((packages_install | default([], true) | select | list)
+                                           + (packages_remove_exclude | select | list)) }}"
+  ansible.builtin.assert:
+    that: pci_kept | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - insecure packages kept via packages_install or
+      packages_remove_exclude without being listed in
+      packages_remove_pci_dss_justified (2.2.4/2.2.5/2.2.7): {{ pci_kept }}
+  when: packages_remove_pci_dss | bool
+
 - name: Remove unwanted packages
   vars:
-    remove_packages: "{{ packages_remove | select
+    pci_packages: "{{ packages_remove_pci_dss_packages | select
+                      | difference(packages_remove_pci_dss_justified | select)
+                      if packages_remove_pci_dss | bool else [] }}"
+    remove_packages: "{{ ((packages_remove | select | list) + pci_packages)
                          | difference(packages_install | select)
                          | difference(packages_remove_exclude | select) }}"
   ansible.builtin.dnf:
