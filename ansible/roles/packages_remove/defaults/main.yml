@@ -41,3 +41,31 @@ packages_remove_autoremove: false
 
 # Display results on output
 packages_remove_display_results: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, packages_remove_pci_dss_packages (insecure,
+# cleartext services and clients) are removed in addition
+# to packages_remove (2.2.4, 2.2.5, 2.2.7), and the role
+# fails before removing anything if one of them is kept
+# via packages_install or packages_remove_exclude without
+# being listed in packages_remove_pci_dss_justified.
+packages_remove_pci_dss: false
+packages_remove_pci_dss_packages:
+  - rsh
+  - rsh-server
+  - talk
+  - talk-server
+  - telnet
+  - telnet-server
+  - tftp
+  - tftp-server
+  - vsftpd
+  - xinetd
+  - ypbind
+  - ypserv
+
+# Packages from the list above to keep on in-scope systems.
+# Only list a package here once its business justification
+# and additional security features are documented (2.2.5).
+packages_remove_pci_dss_justified: []
