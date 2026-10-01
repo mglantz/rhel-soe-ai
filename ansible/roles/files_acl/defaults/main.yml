@@ -8,3 +8,18 @@ files_acl:
 #    etype: user
 #    permissions: r
 #    state: present
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if a
+# requested ACL (state present) on a path under
+# files_acl_pci_dss_log_paths would:
+#  - grant write to anyone (10.3.2)
+#  - grant read to etype other (10.3.1)
+#  - grant read to a user or group not listed in
+#    files_acl_pci_dss_log_readers (10.3.1)
+files_acl_pci_dss: false
+files_acl_pci_dss_log_paths:
+  - /var/log
+  - /run/log
+files_acl_pci_dss_log_readers: []
