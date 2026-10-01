@@ -17,19 +17,24 @@
                       | map(attribute='name') | list }}"
     pci_weak_hash: "{{ pci_pw_users | rejectattr('password', 'regex', '^!?\\$(6|y|gy)\\$|^[!*]+$')
                        | map(attribute='name') | list if accounts_local_password_encrypted else [] }}"
+    pci_weak_cleartext: "{{ pci_pw_users | rejectattr('password', 'regex', '^(?=.*[A-Za-z])(?=.*[0-9]).{' ~ pci_min_length ~ ',}$')
+                            | map(attribute='name') | list if not accounts_local_password_encrypted else [] }}"
+    pci_min_length: "{{ accounts_local_pci_dss_password_min_length | int }}"
   ansible.builtin.assert:
     that:
       - pci_expire_bad | length == 0
       - pci_non_unique | length == 0
       - pci_nopasswd | length == 0
       - pci_weak_hash | length == 0
+      - pci_weak_cleartext | length == 0
     quiet: true
     fail_msg: >-
       PCI DSS violations -
       password_expire_max missing or not 1-{{ pci_max_days }} (8.3.9): {{ pci_expire_bad }};
       non_unique UID/GID (8.2.1): {{ pci_non_unique }};
       passwordless sudo (8.2.2/8.3.1): {{ pci_nopasswd }};
-      password hash not SHA-512/yescrypt (8.3.2): {{ pci_weak_hash }}
+      password hash not SHA-512/yescrypt (8.3.2): {{ pci_weak_hash }};
+      cleartext password shorter than {{ pci_min_length }} or lacking letters and digits (8.3.6): {{ pci_weak_cleartext }}
   when: accounts_local_pci_dss | bool
 
 # https://github.com/ansible/ansible/issues/86199

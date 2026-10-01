@@ -74,5 +74,11 @@ accounts_local_users_groups:
 #    allowed (8.2.2, 8.3.1)
 #  - with accounts_local_password_encrypted, password
 #    hashes must be SHA-512 or yescrypt (8.3.2)
+#  - without accounts_local_password_encrypted, cleartext
+#    passwords must be at least
+#    accounts_local_pci_dss_password_min_length characters
+#    and contain letters and digits (8.3.6); these are
+#    hashed in-role and so bypass pam_pwquality
 accounts_local_pci_dss: false
 accounts_local_pci_dss_password_max_days: 90
+accounts_local_pci_dss_password_min_length: 12
