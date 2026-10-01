@@ -37,6 +37,49 @@
     service_state_enable:
       - nfs-server
 
+    # PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+    # docs/PCI-DSS-v4_0_1.md. Set nfs_server_pci_dss: true
+    # for in-scope hosts only (host_vars/group_vars or -e;
+    # not defined here so inventory can set it per host).
+    # When true, the play fails before making any change if:
+    # - nfs_options has no sec=krb5/krb5i/krb5p, i.e. the
+    #   export trusts client-asserted UIDs (sec=sys) or
+    #   allows sec=none (2.2.5), unless
+    #   nfs_server_pci_dss_insecure_justified is true. Only
+    #   set it after recording the business justification
+    #   and the additional security features in the system
+    #   configuration standard
+    # - nfs_options has no_root_squash or insecure (2.2.6,
+    #   7.2.2)
+    # - nfs_network is a wildcard or /0 (1.3.1)
+
+  pre_tasks:
+    - name: Verify NFS export against PCI DSS
+      vars:
+        _opts: "{{ nfs_options.split(',') | map('trim') | list }}"
+        _sec: "{{ _opts | select('match', '^sec=') | map('regex_replace', '^sec=', '') | join(':') }}"
+        _sec_ok: >-
+          {{ _sec | length > 0 and
+             _sec.split(':') | difference(['krb5', 'krb5i', 'krb5p']) | length == 0 }}
+        _bad_opts: "{{ _opts | intersect(['no_root_squash', 'insecure']) }}"
+        _net_ok: "{{ nfs_network is not search('[*?]') and nfs_network is not search('/0+$') }}"
+      ansible.builtin.assert:
+        that:
+          - _sec_ok | bool or nfs_server_pci_dss_insecure_justified | default(false) | bool
+          - _bad_opts | length == 0
+          - _net_ok | bool
+        quiet: true
+        fail_msg: >-
+          PCI DSS violations on export {{ nfs_export_dir }} -
+          sec= must be only krb5/krb5i/krb5p, or the business
+          justification recorded and
+          nfs_server_pci_dss_insecure_justified set (2.2.5):
+          {{ _sec | default('sys', true) }};
+          no_root_squash/insecure not allowed (2.2.6, 7.2.2): {{ _bad_opts }};
+          nfs_network must not be a wildcard or /0 (1.3.1): {{ nfs_network }}
+      when: nfs_server_pci_dss | default(false) | bool
+      tags: ["always"]
+
   roles:
     - role: packages_install
       tags: ["packages_install"]
