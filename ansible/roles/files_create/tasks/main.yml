@@ -1,4 +1,49 @@
 ---
+- name: Verify paths against PCI DSS
+  vars:
+    pci_files: "{{ files_create | default([], true) | select | list }}"
+    pci_regex: "^({{ files_create_pci_dss_log_paths | map('regex_escape') | join('|') }})(/|$)"
+    pci_log: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files -%}
+      {%-   set p = f.path | default(f.dest | default('')) | string -%}
+      {%-   if p is match(pci_regex) -%}{%- set _ = out.append(p) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+    pci_world: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.mode is defined -%}
+      {%-   set m = ('%o' | format(f.mode)) if f.mode is number else (f.mode | string) -%}
+      {%-   set ns = namespace(ww=false, sticky=false) -%}
+      {%-   if m is match('^[0-7]+$') -%}
+      {%-     set ns.ww = m[-1] in '2367' -%}
+      {%-     set ns.sticky = (m | length) >= 4 and m[-4] in '1357' -%}
+      {%-   else -%}
+      {%-     for c in m.split(',') if c is match('^[ugoa]*[+=]') -%}
+      {%-       set who = c | regex_replace('[+=].*$', '') -%}
+      {%-       set perms = c | regex_replace('^[ugoa]*[+=]', '') -%}
+      {%-       if (who == '' or 'o' in who or 'a' in who) and 'w' in perms -%}
+      {%-         set ns.ww = true -%}
+      {%-       endif -%}
+      {%-       if 't' in perms -%}{%- set ns.sticky = true -%}{%- endif -%}
+      {%-     endfor -%}
+      {%-   endif -%}
+      {%-   if ns.ww and not (f.state == 'directory' and ns.sticky) -%}
+      {%-     set _ = out.append(f.path | default(f.dest | default('?'))) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+  ansible.builtin.assert:
+    that:
+      - pci_log | length == 0
+      - pci_world | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      path created or changed under audit log path (10.3.2): {{ pci_log }};
+      world-writable mode (2.2.6, 10.3.2): {{ pci_world }}
+  when: files_create_pci_dss | bool
+
 - name: Create directories
   ansible.builtin.file:
     state: directory
