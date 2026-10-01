@@ -29,3 +29,20 @@ certificates_exclusive: false
 # NB. Ensure these files are trustworthy!
 certificates_files_known:
   - /etc/pki/ca-trust/source/anchors/katello-server-ca.pem
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true:
+#  - the role fails before making any change unless
+#    certificates_exclusive is true, so the local trust
+#    store holds only the anchors declared above and in
+#    certificates_files_known (4.2.1, 4.2.1.d)
+#  - after applying, the role lists every certificate in
+#    the local anchors and extended format files with its
+#    subject, issuer and expiry date, as evidence for the
+#    trusted certificate inventory (4.2.1.1)
+#  - the role fails if any of these certificates has
+#    expired (4.2.1)
+# Revocation is not checked. Add revoked CAs to
+# certificates_files_blocklist.
+certificates_pci_dss: false
