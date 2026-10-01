@@ -1,4 +1,32 @@
 ---
+- name: Verify fetched paths against PCI DSS
+  vars:
+    pci_files: "{{ files_fetch | default([], true) | select | list }}"
+    pci_regex: "{{ files_fetch_pci_dss_deny_regex | join('|') }}"
+    pci_secret: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files -%}
+      {%-   set p = f.src | default('') | string | normpath -%}
+      {%-   if pci_regex and p is search(pci_regex) -%}{%- set _ = out.append(f.src) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+    pci_nocheck: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.validate_checksum is defined -%}
+      {%-   if not (f.validate_checksum | bool) -%}{%- set _ = out.append(f.src) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+  ansible.builtin.assert:
+    that:
+      - pci_secret | length == 0
+      - pci_nocheck | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      secret or key copied to control node (3.6.1.4, 8.3.2): {{ pci_secret }};
+      checksum validation disabled (10.3.4): {{ pci_nocheck }}
+  when: files_fetch_pci_dss | bool
+
 - name: Fetch files
   ansible.builtin.fetch:
     src: "{{ item.src }}"
