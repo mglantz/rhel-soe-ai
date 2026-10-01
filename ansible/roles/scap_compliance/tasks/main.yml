@@ -1,4 +1,17 @@
 ---
+- name: Verify configuration against PCI DSS
+  ansible.builtin.assert:
+    that:
+      - scap_compliance_profile == 'pci-dss'
+      - not scap_compliance_check_fail_role_pass | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation for scap_compliance -
+      {{ 'profile is ' ~ scap_compliance_profile ~ ', not pci-dss (2.2.1)'
+         if scap_compliance_profile != 'pci-dss'
+         else 'scap_compliance_check_fail_role_pass hides failed checks (2.2.1.c)' }}
+  when: scap_compliance_pci_dss | bool
+
 - name: Gather needed facts
   ansible.builtin.setup:
     gather_subset:

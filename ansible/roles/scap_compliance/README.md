@@ -52,6 +52,20 @@ scap_compliance_check_result_show_all: false
 
 # Allow role to complete even if compliance check fails
 scap_compliance_check_fail_role_pass: false
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before installing or running
+# anything unless:
+#  - scap_compliance_profile is pci-dss, the RHEL vendor
+#    hardening baseline for PCI DSS (2.2.1); deviations
+#    belong in a tailoring file, not a different profile
+#  - scap_compliance_check_fail_role_pass is false, so a
+#    non-compliant host fails the run instead of passing
+#    silently (2.2.1.c)
+# Keeping past results as assessment evidence is not done
+# here, as only the most recent results are stored.
+scap_compliance_pci_dss: false
 </pre>
 
 ## License
