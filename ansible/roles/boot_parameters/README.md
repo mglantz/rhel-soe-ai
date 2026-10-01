@@ -34,6 +34,24 @@ boot_parameters_timeout: 1
 
 # Reboot system after parameter changes
 boot_parameters_reboot: true
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if
+# the requested boot configuration conflicts with PCI DSS:
+#  - boot_parameters_enable must contain audit=1 and
+#    audit_backlog_limit=N with N >= 8192, so processes
+#    started before auditd are audited too (10.2.1)
+#  - boot_parameters_enable must not contain audit=0,
+#    selinux=0 or enforcing=0 (10.2.1, 2.2.6)
+#  - boot_parameters_disable must not remove audit or
+#    audit_backlog_limit (10.2.1)
+#  - boot_parameters_password must be set to a PBKDF2
+#    hash, so boot entries cannot be edited to get a
+#    root shell without authentication (2.2.6)
+# New parameters take effect only after a reboot, see
+# boot_parameters_reboot.
+boot_parameters_pci_dss: false
 </pre>
 
 ## License
