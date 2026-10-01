@@ -20,3 +20,16 @@ files_create:
 #    src: /opt/dir/file
 #    path: /opt/dir/link
 #    force: true
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if an
+# entry in files_create would:
+#  - create or change a path under files_create_pci_dss_log_paths,
+#    altering audit logs or their permissions (10.3.2)
+#  - set a world-writable mode (2.2.6, 10.3.2); directories
+#    with the sticky bit set (e.g. '1777') are allowed
+files_create_pci_dss: false
+files_create_pci_dss_log_paths:
+  - /var/log
+  - /run/log
