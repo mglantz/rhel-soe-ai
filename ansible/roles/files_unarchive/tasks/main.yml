@@ -1,4 +1,47 @@
 ---
+- name: Verify archives against PCI DSS
+  vars:
+    pci_files: "{{ files_unarchive | default([], true) | select | list }}"
+    pci_regex: "^({{ files_unarchive_pci_dss_log_paths | map('regex_escape') | join('|') }})(/|$)"
+    pci_log: "{{ pci_files | selectattr('dest', 'defined') | selectattr('dest', 'match', pci_regex)
+                 | map(attribute='dest') | unique | list }}"
+    pci_world: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.mode is defined -%}
+      {%-   set m = ('%o' | format(f.mode)) if f.mode is number else (f.mode | string) -%}
+      {%-   set ns = namespace(ww=false) -%}
+      {%-   if m is match('^[0-7]+$') -%}
+      {%-     set ns.ww = m[-1] in '2367' -%}
+      {%-   else -%}
+      {%-     for c in m.split(',') if c is match('^[ugoa]*[+=]') -%}
+      {%-       set who = c | regex_replace('[+=].*$', '') -%}
+      {%-       if (who == '' or 'o' in who or 'a' in who) and 'w' in (c | regex_replace('^[ugoa]*[+=]', '')) -%}
+      {%-         set ns.ww = true -%}
+      {%-       endif -%}
+      {%-     endfor -%}
+      {%-   endif -%}
+      {%-   if ns.ww -%}{%- set _ = out.append(f.src ~ ' -> ' ~ f.dest) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+    pci_nocert: >-
+      {%- set out = [] -%}
+      {%- for f in pci_files if f.validate_certs is defined -%}
+      {%-   if not (f.validate_certs | bool) -%}{%- set _ = out.append(f.src) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out | unique | list }}
+  ansible.builtin.assert:
+    that:
+      - pci_log | length == 0
+      - pci_world | length == 0
+      - pci_nocert | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      archive extracted to audit log path (10.3.2): {{ pci_log }};
+      world-writable mode (2.2.6, 10.3.2): {{ pci_world }};
+      certificate validation disabled (4.2.1): {{ pci_nocert }}
+  when: files_unarchive_pci_dss | bool
+
 - name: Install required packages
   vars:
     base_pkgs: "{{ ['gzip', 'tar', 'xz'] }}"
