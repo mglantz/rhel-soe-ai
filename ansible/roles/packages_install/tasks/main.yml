@@ -1,4 +1,17 @@
 ---
+- name: Verify packages against PCI DSS
+  vars:
+    pci_insecure: "{{ packages_install | default([], true) | select
+                      | intersect(packages_install_pci_dss_insecure | default([], true) | select) | list }}"
+  ansible.builtin.assert:
+    that:
+      - pci_insecure | length == 0 or packages_install_pci_dss_insecure_justified | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - insecure service/protocol packages requested
+      without documented justification (2.2.4/2.2.5/2.2.7): {{ pci_insecure }}
+  when: packages_install_pci_dss | bool
+
 - name: Install wanted packages
   ansible.builtin.dnf:
     name: "{{ packages_install | select }}"
