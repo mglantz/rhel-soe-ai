@@ -1,4 +1,53 @@
 ---
+- name: Verify account policy against PCI DSS
+  vars:
+    pci_required:
+      faillock_config_file: "{{ faillock_config_file | default('', true) }}"
+      pwquality_config_file: "{{ pwquality_config_file | default('', true) }}"
+      pwhistory_config_file: "{{ pwhistory_config_file | default('', true) }}"
+      login_defs_config_file: "{{ login_defs_config_file | default('', true) }}"
+      system_auth_profile: "{{ system_auth_profile | default('', true) }}"
+    pci_unset: "{{ pci_required | dict2items | rejectattr('value') | map(attribute='key') | list }}"
+    pci_faillock: "{{ lookup('ansible.builtin.template', faillock_config_file) if faillock_config_file else '' }}"
+    pci_pwquality: "{{ lookup('ansible.builtin.template', pwquality_config_file) if pwquality_config_file else '' }}"
+    pci_pwhistory: "{{ lookup('ansible.builtin.template', pwhistory_config_file) if pwhistory_config_file else '' }}"
+    pci_login_defs: "{{ lookup('ansible.builtin.template', login_defs_config_file) if login_defs_config_file else '' }}"
+    # Unset keys fall back to the PAM/shadow-utils built-in defaults
+    pci_deny: "{{ pci_faillock | regex_search('(?m)^\\s*deny\\s*=\\s*(\\d+)', '\\1') | default(['3'], true) | first | int }}"
+    pci_unlock: "{{ pci_faillock | regex_search('(?m)^\\s*unlock_time\\s*=\\s*(\\d+|never)', '\\1') | default(['600'], true) | first | replace('never', '0') | int }}"
+    pci_minlen: "{{ pci_pwquality | regex_search('(?m)^\\s*minlen\\s*=\\s*(\\d+)', '\\1') | default(['8'], true) | first | int }}"
+    pci_minclass: "{{ pci_pwquality | regex_search('(?m)^\\s*minclass\\s*=\\s*(\\d+)', '\\1') | default(['0'], true) | first | int }}"
+    pci_dcredit: "{{ pci_pwquality | regex_search('(?m)^\\s*dcredit\\s*=\\s*(-?\\d+)', '\\1') | default(['0'], true) | first | int }}"
+    pci_ucredit: "{{ pci_pwquality | regex_search('(?m)^\\s*ucredit\\s*=\\s*(-?\\d+)', '\\1') | default(['0'], true) | first | int }}"
+    pci_lcredit: "{{ pci_pwquality | regex_search('(?m)^\\s*lcredit\\s*=\\s*(-?\\d+)', '\\1') | default(['0'], true) | first | int }}"
+    pci_remember: "{{ pci_pwhistory | regex_search('(?m)^\\s*remember\\s*=\\s*(\\d+)', '\\1') | default(['10'], true) | first | int }}"
+    pci_max_days: "{{ pci_login_defs | regex_search('(?m)^\\s*PASS_MAX_DAYS\\s+(\\d+)', '\\1') | default(['99999'], true) | first | int }}"
+    pci_profile_params: "{{ system_auth_profile_parameters | default('', true) }}"
+  ansible.builtin.assert:
+    that:
+      - pci_unset | length == 0
+      - pci_deny | int >= 1 and pci_deny | int <= 10
+      - pci_unlock | int == 0 or pci_unlock | int >= 1800
+      - pci_minlen | int >= 12
+      - pci_minclass | int >= 4 or
+        (pci_dcredit | int < 0 and (pci_lcredit | int < 0 or pci_ucredit | int < 0))
+      - pci_remember | int >= 4
+      - pci_max_days | int >= 1
+      - pci_max_days | int <= accounts_policy_pci_dss_password_max_days | int
+      - "'custom/' in pci_required.system_auth_profile or
+        ('with-faillock' in pci_profile_params and 'with-pwhistory' in pci_profile_params)"
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      unset (must be set): {{ pci_unset }};
+      faillock deny {{ pci_deny }} unlock_time {{ pci_unlock }}, need deny 1-10 and unlock_time 0 or >= 1800 (8.3.4);
+      pwquality minlen {{ pci_minlen }} minclass {{ pci_minclass }} dcredit {{ pci_dcredit }}
+      lcredit {{ pci_lcredit }} ucredit {{ pci_ucredit }}, need minlen >= 12 with digits and letters (8.3.6);
+      pwhistory remember {{ pci_remember }}, need >= 4 (8.3.7);
+      PASS_MAX_DAYS {{ pci_max_days }}, need 1-{{ accounts_policy_pci_dss_password_max_days }} (8.3.9);
+      authselect '{{ system_auth_profile }} {{ pci_profile_params }}', non-custom profiles need with-faillock with-pwhistory
+  when: accounts_policy_pci_dss | bool
+
 - name: Create system-local new user defaults file
   ansible.builtin.template:
     src: "{{ useradd_defaults_file }}"
@@ -15,7 +64,7 @@
     mode: '0644'
   when:
     - login_defs_config_file is not none
-    - login_defs_config_file length > 0
+    - login_defs_config_file | length > 0
 
 - name: Create system-local login access file
   ansible.builtin.template:
