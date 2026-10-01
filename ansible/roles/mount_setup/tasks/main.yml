@@ -1,4 +1,48 @@
 ---
+- name: Verify mount credentials against PCI DSS
+  ansible.builtin.assert:
+    that: (item.opts | default('')).split(',') | map('trim') | select('match', '^pass(word2?)?=') | length == 0
+    quiet: true
+    fail_msg: >-
+      Mount {{ item.path }} has a cleartext password in its options,
+      which would be stored in world-readable /etc/fstab on this
+      PCI DSS in-scope system (8.3.2, 8.6.2). Use credentials=<file>
+      with a root-only (0600) credentials file instead
+  loop: "{{ (mount_setup_enable | select | list) + (mount_setup_disable | select | list) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - mount_setup_pci_dss | bool
+    - item.state | default('') not in ['absent', 'absent_from_fstab']
+
+- name: Verify mount protocols against PCI DSS
+  vars:
+    _opts: "{{ (item.opts | default('')).split(',') | map('trim') | list }}"
+    _sec: "{{ _opts | select('match', '^sec=') | map('regex_replace', '^sec=', '') | join(':') }}"
+    _fstype: "{{ item.fstype | default('') }}"
+    _insecure: >-
+      {{ (_fstype is match('^nfs') and
+          (_sec | length == 0 or _sec.split(':') | intersect(['sys', 'none']) | length > 0))
+         or (_fstype == 'cifs' and
+          ('vers=1.0' in _opts or 'guest' in _opts or _sec == 'none')) }}
+  ansible.builtin.assert:
+    that: not _insecure | bool or item.path in mount_setup_pci_dss_insecure_justified
+    quiet: true
+    fail_msg: >-
+      Mount {{ item.path }} uses an insecure protocol ({{ _fstype }},
+      opts={{ item.opts | default('defaults') }})
+      on this PCI DSS in-scope system (2.2.5). Use NFS with
+      sec=krb5/krb5i/krb5p or SMB 2+/3 with authentication, or
+      record the business justification and additional security
+      features in the system configuration standard and add the
+      path to mount_setup_pci_dss_insecure_justified
+  loop: "{{ mount_setup_enable | select | list }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - mount_setup_pci_dss | bool
+    - item.state | default('') not in ['absent', 'absent_from_fstab']
+
 - name: Install required packages
   vars:
     required_packages: >
