@@ -1,4 +1,17 @@
 ---
+- name: Verify configuration against PCI DSS
+  ansible.builtin.assert:
+    that:
+      - scap_satellite_policies | selectattr('profile', 'equalto', scap_satellite_pci_dss_profile) | list | length > 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation for scap_satellite -
+      no policy in scap_satellite_policies uses profile
+      {{ scap_satellite_pci_dss_profile }} (2.2.1)
+  vars:
+    scap_satellite_pci_dss_profile: xccdf_org.ssgproject.content_profile_pci-dss
+  when: scap_satellite_pci_dss | bool
+
 - name: Install Satellite SCAP client package
   ansible.builtin.dnf:
     name: foreman_scap_client_bash
