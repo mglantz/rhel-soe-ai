@@ -7,6 +7,33 @@
       - distribution_major_version
   when: ansible_facts.distribution_major_version is not defined
 
+- name: Verify boot parameters against PCI DSS
+  vars:
+    pci_enable: "{{ boot_parameters_enable | default([], true) | select | map('string') | list }}"
+    pci_disable: "{{ boot_parameters_disable | default([], true) | select | map('string') | list }}"
+    pci_backlog: "{{ pci_enable | select('match', '^audit_backlog_limit=[0-9]+$')
+                     | map('regex_replace', '^audit_backlog_limit=', '') | map('int') | list }}"
+    pci_forbidden: "{{ pci_enable | select('match', '^(audit|selinux|enforcing)=0$') | list }}"
+    pci_removed: "{{ pci_disable | select('match', '^(audit|audit_backlog_limit)(=.*)?$') | list }}"
+  ansible.builtin.assert:
+    that:
+      - "'audit=1' in pci_enable"
+      - pci_backlog | length > 0
+      - pci_backlog | min >= 8192
+      - pci_forbidden | length == 0
+      - pci_removed | length == 0
+      - boot_parameters_password | default('', true) is match('^grub\.pbkdf2\.sha512\.')
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      audit=1 in boot_parameters_enable (10.2.1): {{ 'audit=1' in pci_enable }};
+      audit_backlog_limit >= 8192 in boot_parameters_enable (10.2.1): {{ pci_backlog }};
+      security disabled in boot_parameters_enable (10.2.1/2.2.6): {{ pci_forbidden }};
+      audit removed via boot_parameters_disable (10.2.1): {{ pci_removed }};
+      boot_parameters_password set to a PBKDF2 hash (2.2.6):
+      {{ boot_parameters_password | default('', true) is match('^grub\.pbkdf2\.sha512\.') }}
+  when: boot_parameters_pci_dss | bool
+
 - name: Install grubby package
   ansible.builtin.dnf:
     name: grubby
