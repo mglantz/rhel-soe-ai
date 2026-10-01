@@ -22,3 +22,20 @@ crypto_policy: DEFAULT
 
 # Enable or disable SCP protocol (not scp(1))
 scp_protocol_enable: true
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if:
+#  - selinux is not enforcing (2.2.6)
+#  - crypto_policy, or any of its subpolicies, is listed
+#    in security_hardening_pci_dss_crypto_denied, as
+#    these allow insecure algorithms, key sizes or
+#    protocol fallback (2.2.7, 4.2.1, 8.3.2)
+security_hardening_pci_dss: false
+
+# Crypto policies and subpolicies not permitted on
+# in-scope systems (case-insensitive)
+security_hardening_pci_dss_crypto_denied:
+  - LEGACY
+  - SHA1
+  - AD-SUPPORT-LEGACY

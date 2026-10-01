@@ -1,4 +1,19 @@
 ---
+- name: Verify settings against PCI DSS
+  vars:
+    pci_crypto: "{{ crypto_policy | upper | split(':')
+                    | intersect(security_hardening_pci_dss_crypto_denied | default([], true) | map('upper')) }}"
+  ansible.builtin.assert:
+    that:
+      - selinux == 'enforcing'
+      - pci_crypto | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - selinux must be enforcing (2.2.6), is: {{ selinux }};
+      crypto_policy must not use {{ security_hardening_pci_dss_crypto_denied }}
+      (2.2.7/4.2.1/8.3.2), is: {{ crypto_policy }}
+  when: security_hardening_pci_dss | bool
+
 - name: Gather needed facts
   ansible.builtin.setup:
     gather_subset:
