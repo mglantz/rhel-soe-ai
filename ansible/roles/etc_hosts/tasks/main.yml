@@ -53,6 +53,8 @@
   ansible.builtin.copy:
     content: "{{ etc_hosts_content }}"
     dest: /etc/hosts
+    owner: root
+    group: root
     mode: '0644'
   register: hosts_file
 
