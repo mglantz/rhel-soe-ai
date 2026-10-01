@@ -24,6 +24,24 @@
   register: daemon_config
   when: ansible_facts.distribution_major_version | int == 8
 
+- name: Create systemd-resolved drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    mode: '0755'
+  when: dns_cache_pci_dss | bool
+
+- name: Disable LLMNR and MulticastDNS in systemd-resolved
+  ansible.builtin.copy:
+    content: |
+      [Resolve]
+      LLMNR=no
+      MulticastDNS=no
+    dest: /etc/systemd/resolved.conf.d/90-pci-dss.conf
+    mode: '0644'
+  register: pci_config
+  when: dns_cache_pci_dss | bool
+
 - name: Enable systemd-resolved service
   ansible.builtin.service:
     name: systemd-resolved
@@ -44,7 +62,8 @@
   when:
     - "'systemd-resolved.service' in ansible_facts.services"
     - service_start is not changed
-    - daemon_config is changed
+    - daemon_config is changed or
+      pci_config is changed
 
 - name: Update NetworkManager DNS cache configuration
   ansible.builtin.copy:

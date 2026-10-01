@@ -32,6 +32,19 @@ dns_cache_dnsmasq_local_domain:
 # NetworkManager dnsmasq configuration template
 # to use instead of the role provided default one
 dns_cache_nm_dnsmasq_config_file:
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true:
+#  - with systemd-resolved, LLMNR and MulticastDNS are
+#    turned off in /etc/systemd/resolved.conf.d/90-pci-dss.conf,
+#    so the cache does not answer or trust unauthenticated
+#    name resolution on the network (2.2.4, 2.2.5)
+#  - after applying, the role lists the sockets that dnsmasq
+#    and systemd-resolved listen on as evidence, and fails if
+#    any of them is bound to an address other than loopback
+#    (1.2.5, 2.2.4)
+dns_cache_pci_dss: false
 </pre>
 
 ## License
