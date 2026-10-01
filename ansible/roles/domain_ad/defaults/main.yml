@@ -29,3 +29,20 @@ domain_ad_auth_select_parameters: without-nullok with-pamaccess with-mkhomedir
 # if not using the role provided default files
 domain_ad_krb5_config_file:
 domain_ad_sssd_config_file:
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, joining fails before making any change if:
+#  - domain_ad_allow_groups is empty while using the
+#    role provided sssd.conf, which would let every AD
+#    user log in (7.2.1, 7.2.2)
+#  - domain_ad_auth_select_parameters lacks
+#    without-nullok (8.3.1)
+#  - the offline lockout values below are out of range
+# The role provided sssd.conf also locks out cached
+# (offline) logins after the given number of failures
+# for the given number of minutes, 0 meaning until the
+# AD domain is reachable again (8.3.4)
+domain_ad_pci_dss: false
+domain_ad_pci_dss_offline_failed_login_attempts: 10
+domain_ad_pci_dss_offline_failed_login_delay: 30
