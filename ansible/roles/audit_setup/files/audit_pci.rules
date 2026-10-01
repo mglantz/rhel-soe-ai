@@ -1,0 +1,113 @@
+## PCI DSS 4.0.1 Requirement 10.2 audit rules
+## Based on the audit package sample 30-pci-dss-v31.rules,
+## renumbered to PCI DSS 4.0.1 and extended where 4.0.1
+## asks for more than v3.1 did.
+##
+## NOTE:
+## 1) Base configuration (-D, -b, -f) is expected to come from
+##    /etc/audit/rules.d/audit.rules as shipped by the audit package.
+## 2) This file does not make the rules immutable (-e 2). Add it in a
+##    later rules file if wanted, see audit_setup_update_lock.
+## 3) It is assumed that 1000 is UID_MIN in /etc/login.defs.
+## 4) You can search for the results on the key fields in the rules,
+##    e.g. ausearch -k 10.2.1.5-accounts -i
+
+## 10.2.1.1 Individual user access to cardholder data.
+## Site specific, needs the path of the data and the daemon account
+## that accesses it legitimately.
+#-a always,exit -F arch=b32 -F path=path-to-db -F auid>=1000 -F auid!=unset -F uid!=daemon-acct -F perm=r -F key=10.2.1.1-cardholder-access
+#-a always,exit -F arch=b64 -F path=path-to-db -F auid>=1000 -F auid!=unset -F uid!=daemon-acct -F perm=r -F key=10.2.1.1-cardholder-access
+
+## 10.2.1.2 All actions taken by individuals with administrative access.
+## Commands run as root by a logged in user (sudo, su, setuid).
+## Keystrokes in interactive root shells additionally need pam_tty_audit:
+## session   required pam_tty_audit.so disable=* enable=root
+-a always,exit -F arch=b32 -S execve -F euid=0 -F auid>=1000 -F auid!=unset -F key=10.2.1.2-admin-actions
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=unset -F key=10.2.1.2-admin-actions
+## systemd-run and pkexec are not audit aware, watch them specifically
+-a always,exit -F arch=b32 -F path=/usr/bin/systemd-run -F perm=x -F auid!=unset -F key=10.2.1.2-maybe-escalation
+-a always,exit -F arch=b64 -F path=/usr/bin/systemd-run -F perm=x -F auid!=unset -F key=10.2.1.2-maybe-escalation
+-a always,exit -F arch=b32 -F path=/usr/bin/pkexec -F perm=x -F key=10.2.1.2-maybe-escalation
+-a always,exit -F arch=b64 -F path=/usr/bin/pkexec -F perm=x -F key=10.2.1.2-maybe-escalation
+
+## 10.2.1.3 All access to audit logs.
+-a always,exit -F arch=b32 -F dir=/var/log/audit/ -F perm=r -F auid>=1000 -F auid!=unset -F key=10.2.1.3-access-audit-trail
+-a always,exit -F arch=b64 -F dir=/var/log/audit/ -F perm=r -F auid>=1000 -F auid!=unset -F key=10.2.1.3-access-audit-trail
+-a always,exit -F arch=b32 -F path=/usr/sbin/ausearch -F perm=x -F key=10.2.1.3-access-audit-trail
+-a always,exit -F arch=b64 -F path=/usr/sbin/ausearch -F perm=x -F key=10.2.1.3-access-audit-trail
+-a always,exit -F arch=b32 -F path=/usr/sbin/aureport -F perm=x -F key=10.2.1.3-access-audit-trail
+-a always,exit -F arch=b64 -F path=/usr/sbin/aureport -F perm=x -F key=10.2.1.3-access-audit-trail
+
+## 10.2.1.4 All invalid logical access attempts.
+## Failed logins are logged by PAM, find them with:
+##   ausearch --start today -m user_login,user_auth -sv no -i
+## Denied file access by users:
+-a always,exit -F arch=b32 -S openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=10.2.1.4-access-denied
+-a always,exit -F arch=b64 -S openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=10.2.1.4-access-denied
+-a always,exit -F arch=b32 -S openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=10.2.1.4-access-denied
+-a always,exit -F arch=b64 -S openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=10.2.1.4-access-denied
+
+## 10.2.1.5 All changes to identification and authentication credentials:
+## creation of accounts, elevation of privileges, changes to accounts
+## with administrative access. shadow-utils and PAM log these natively,
+## the rules below also catch hand edits of the databases.
+-a always,exit -F arch=b32 -F path=/etc/group -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b64 -F path=/etc/group -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b32 -F path=/etc/passwd -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b64 -F path=/etc/passwd -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b32 -F path=/etc/gshadow -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b64 -F path=/etc/gshadow -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b32 -F path=/etc/shadow -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b64 -F path=/etc/shadow -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b32 -F path=/etc/security/opasswd -F perm=wa -F key=10.2.1.5-accounts
+-a always,exit -F arch=b64 -F path=/etc/security/opasswd -F perm=wa -F key=10.2.1.5-accounts
+## Configuration of privilege escalation
+-a always,exit -F arch=b32 -F path=/etc/sudoers -F perm=wa -F key=10.2.1.5-priv-config-changes
+-a always,exit -F arch=b64 -F path=/etc/sudoers -F perm=wa -F key=10.2.1.5-priv-config-changes
+-a always,exit -F arch=b32 -F dir=/etc/sudoers.d/ -F perm=wa -F key=10.2.1.5-priv-config-changes
+-a always,exit -F arch=b64 -F dir=/etc/sudoers.d/ -F perm=wa -F key=10.2.1.5-priv-config-changes
+## Elevation of privileges
+-a always,exit -F arch=b32 -S setuid -F a0=0 -F exe=/usr/bin/su -F key=10.2.1.5-elevated-privs-session
+-a always,exit -F arch=b64 -S setuid -F a0=0 -F exe=/usr/bin/su -F key=10.2.1.5-elevated-privs-session
+-a always,exit -F arch=b32 -S setresuid -F a0=0 -F exe=/usr/bin/sudo -F key=10.2.1.5-elevated-privs-session
+-a always,exit -F arch=b64 -S setresuid -F a0=0 -F exe=/usr/bin/sudo -F key=10.2.1.5-elevated-privs-session
+-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -F key=10.2.1.5-elevated-privs-setuid
+-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -F key=10.2.1.5-elevated-privs-setuid
+
+## 10.2.1.6 Initialization, stopping or pausing of audit logs.
+## auditd logs DAEMON_START/DAEMON_END/CONFIG_CHANGE natively, the rules
+## below catch changes to the audit configuration and runtime changes.
+-a always,exit -F arch=b32 -F dir=/etc/audit/ -F perm=wa -F key=10.2.1.6-audit-config
+-a always,exit -F arch=b64 -F dir=/etc/audit/ -F perm=wa -F key=10.2.1.6-audit-config
+-a always,exit -F arch=b32 -F path=/usr/sbin/auditctl -F perm=x -F key=10.2.1.6-audit-tools
+-a always,exit -F arch=b64 -F path=/usr/sbin/auditctl -F perm=x -F key=10.2.1.6-audit-tools
+-a always,exit -F arch=b32 -F path=/usr/sbin/augenrules -F perm=x -F key=10.2.1.6-audit-tools
+-a always,exit -F arch=b64 -F path=/usr/sbin/augenrules -F perm=x -F key=10.2.1.6-audit-tools
+
+## 10.2.1.7 Creation and deletion of system-level objects.
+## Kernel modules and mounts
+-a always,exit -F arch=b32 -S init_module,finit_module,delete_module -F key=10.2.1.7-modules
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -F key=10.2.1.7-modules
+-a always,exit -F arch=b32 -S mount,umount2 -F auid!=unset -F key=10.2.1.7-mounts
+-a always,exit -F arch=b64 -S mount,umount2 -F auid!=unset -F key=10.2.1.7-mounts
+## systemd units
+-a always,exit -F arch=b32 -F dir=/etc/systemd/system/ -F perm=wa -F key=10.2.1.7-system-objects
+-a always,exit -F arch=b64 -F dir=/etc/systemd/system/ -F perm=wa -F key=10.2.1.7-system-objects
+
+## 10.2.2 User, type, date and time, success/failure, origin and affected
+## object are recorded in every audit event. log_format = ENRICHED in
+## auditd.conf also resolves uids/gids for logs forwarded off the host.
+
+## 10.3.2 / 10.3.4 Changes to audit log files.
+-a always,exit -F arch=b32 -F dir=/var/log/audit/ -F perm=wa -F key=10.3.4-modification-audit
+-a always,exit -F arch=b64 -F dir=/var/log/audit/ -F perm=wa -F key=10.3.4-modification-audit
+
+## 10.6.3 Changes to time synchronization settings and data.
+-a always,exit -F arch=b32 -S adjtimex,settimeofday -F key=10.6.3-time-change
+-a always,exit -F arch=b64 -S adjtimex,settimeofday -F key=10.6.3-time-change
+-a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -F key=10.6.3-time-change
+-a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -F key=10.6.3-time-change
+-a always,exit -F arch=b32 -F path=/etc/localtime -F perm=wa -F key=10.6.3-time-change
+-a always,exit -F arch=b64 -F path=/etc/localtime -F perm=wa -F key=10.6.3-time-change
+-a always,exit -F arch=b32 -F path=/etc/chrony.conf -F perm=wa -F key=10.6.3-time-change
+-a always,exit -F arch=b64 -F path=/etc/chrony.conf -F perm=wa -F key=10.6.3-time-change

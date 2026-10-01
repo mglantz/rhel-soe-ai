@@ -13,6 +13,48 @@
       - audit_setup_update_lock in ['fail', 'ignore', 'reboot']
     quiet: true
 
+- name: Verify audit configuration against PCI DSS
+  vars:
+    pci_required:
+      audit_setup_config_file: "{{ audit_setup_config_file | default('', true) }}"
+      audit_setup_rules_file: "{{ audit_setup_rules_file | default('', true) }}"
+    pci_unset: "{{ pci_required | dict2items | rejectattr('value') | map(attribute='key') | list }}"
+    pci_conf: "{{ lookup('ansible.builtin.file', audit_setup_config_file) if pci_required.audit_setup_config_file else '' }}"
+    pci_rules: "{{ lookup('ansible.builtin.file', audit_setup_rules_file) if pci_required.audit_setup_rules_file else '' }}"
+    # Unset keys fall back to the auditd built-in defaults
+    pci_logging_off: "{{ ['write_logs', 'local_events'] |
+      select('in', pci_conf | regex_findall('(?mi)^\\s*(\\w+)\\s*=\\s*no\\s*$')) | list }}"
+    pci_failure_ignored: "{{ ['space_left_action', 'admin_space_left_action', 'disk_full_action', 'disk_error_action'] |
+      select('in', pci_conf | regex_findall('(?mi)^\\s*(\\w+)\\s*=\\s*ignore\\s*$')) | list }}"
+    pci_rules_patterns:
+      10.2.1.2 execve: '(?m)^\s*-a\s.*-S\s+(\S+,)?execve\b'
+      10.2.1.3 /var/log/audit: '(?m)^\s*-[aw]\s.*/var/log/audit'
+      10.2.1.5 /etc/passwd: '(?m)^\s*-[aw]\s.*/etc/passwd\b'
+      10.2.1.5 /etc/shadow: '(?m)^\s*-[aw]\s.*/etc/shadow\b'
+      10.2.1.5 /etc/group: '(?m)^\s*-[aw]\s.*/etc/group\b'
+      10.2.1.5 /etc/gshadow: '(?m)^\s*-[aw]\s.*/etc/gshadow\b'
+      10.2.1.5 /etc/sudoers: '(?m)^\s*-[aw]\s.*/etc/sudoers\b'
+      10.2.1.6 /etc/audit: '(?m)^\s*-[aw]\s.*/etc/audit\b'
+    pci_rules_missing: "[{% for k, v in pci_rules_patterns.items() if pci_rules is not regex(v) %}'{{ k }}',{% endfor %}]"
+    pci_rules_disable_re: '(?m)^\s*-e\s+0\b'
+    pci_rules_disabled: "{{ pci_rules is regex(pci_rules_disable_re) }}"
+  ansible.builtin.assert:
+    that:
+      - pci_unset | length == 0
+      - pci_logging_off | length == 0
+      - pci_failure_ignored | length == 0
+      - not pci_rules_disabled | bool
+      - pci_rules_missing | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      unset (must be set): {{ pci_unset }};
+      auditd.conf logging disabled: {{ pci_logging_off }} (10.2.1);
+      auditd.conf failures ignored: {{ pci_failure_ignored }} (10.7.2);
+      rules disable auditing with -e 0: {{ pci_rules_disabled }} (10.2.1);
+      rules missing coverage: {{ pci_rules_missing }}
+  when: audit_setup_pci_dss | bool
+
 - name: Fail if audit disabled in kernel
   ansible.builtin.fail:
     msg: "Audit disabled on kernel command line."
