@@ -1,0 +1,11 @@
+---
+# PCI DSS insecure units to disable and stop, see
+# service_state_pci_dss in defaults/main.yml
+__service_state_pci_units: "{{ service_state_pci_dss_units | select
+                               | difference(service_state_pci_dss_justified | select
+                                            | map('regex_replace', '^([^.]+)$', '\\1.service'))
+                               if service_state_pci_dss | bool else [] }}"
+
+# Units to disable and stop
+__service_state_disable: "{{ (service_state_disable | select | list)
+                             + __service_state_pci_units }}"

@@ -1,4 +1,18 @@
 ---
+- name: Verify service state against PCI DSS
+  vars:
+    pci_wanted: "{{ ((service_state_enable | select | list) + (service_state_unmask | select | list))
+                    | map('regex_replace', '^([^.]+)$', '\\1.service') | unique }}"
+    pci_kept: "{{ pci_wanted | intersect(__service_state_pci_units) }}"
+  ansible.builtin.assert:
+    that: pci_kept | length == 0
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - insecure units enabled or unmasked via
+      service_state_enable or service_state_unmask without being listed in
+      service_state_pci_dss_justified (2.2.4/2.2.5/2.2.7): {{ pci_kept }}
+  when: service_state_pci_dss | bool
+
 # https://github.com/ansible-collections/community.general/issues/4896
 # ansible-core >= 2.16 can use community.general >= 10 with updated systemd_info
 - name: Get list of known systemd units
@@ -7,7 +21,7 @@
   ansible.builtin.command: systemctl list-unit-files
   register: unit_files_known
   changed_when: false
-  when: service_state_disable | select | length > 0 or
+  when: __service_state_disable | length > 0 or
         service_state_enable | select | length > 0 or
         service_state_restart | select | length > 0
 
@@ -33,7 +47,7 @@
     name: "{{ item }}"
     enabled: false
   register: disable_services
-  loop: "{{ service_state_disable | select }}"
+  loop: "{{ __service_state_disable }}"
   when:
     - item in unit_files_known.stdout
     - item not in service_state_enable | select
@@ -44,7 +58,7 @@
     name: "{{ item }}"
     state: stopped
   register: stop_services
-  loop: "{{ service_state_disable | select }}"
+  loop: "{{ __service_state_disable }}"
   when:
     - item in unit_files_known.stdout
     - item not in service_state_enable | select
