@@ -1,4 +1,23 @@
 ---
+- name: Verify Splunk Forwarder configuration against PCI DSS
+  vars:
+    pci_server_ok: "{{ splunk_deployment_server | default('', true) | string | length > 0 }}"
+    pci_check_ok: "{{ splunk_deployment_server_check | bool }}"
+    pci_hash_ok: "{{ splunk_user_config_file | default('', true) | length > 0 or
+                     splunk_user_password_hash | default('', true) | string is match('^\\$6\\$') }}"
+  ansible.builtin.assert:
+    that:
+      - pci_server_ok | bool
+      - pci_check_ok | bool
+      - pci_hash_ok | bool
+    quiet: true
+    fail_msg: >-
+      PCI DSS violations -
+      splunk_deployment_server set (10.3.3): {{ pci_server_ok }};
+      splunk_deployment_server_check enabled (10.3.3/10.7.2): {{ pci_check_ok }};
+      splunk_user_password_hash is SHA-512 crypt (2.2.2/8.3.2/8.6.2): {{ pci_hash_ok }}
+  when: splunk_forwarder_pci_dss | bool
+
 - name: Gather needed facts
   ansible.builtin.setup:
     gather_subset:
