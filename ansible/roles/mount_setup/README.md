@@ -24,6 +24,23 @@ mount_setup_enable:
 #    fstype: nfs
 #    opts: _netdev,hard
 #    state: mounted
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change if:
+# - a mount has a cleartext password in its options (CIFS
+#   password=/pass=), which would be stored in world-readable
+#   /etc/fstab (8.3.2, 8.6.2). Use credentials=<file> with a
+#   root-only (0600) credentials file instead
+# - a mount uses an insecure protocol (NFS without Kerberos,
+#   i.e. no sec= or sec=sys/none; CIFS vers=1.0, guest or
+#   sec=none) and its path is not listed in
+#   mount_setup_pci_dss_insecure_justified. Only list a path
+#   after recording the business justification and the
+#   additional security features in the system configuration
+#   standard (2.2.5)
+mount_setup_pci_dss: false
+mount_setup_pci_dss_insecure_justified: []
 </pre>
 
 ## License
