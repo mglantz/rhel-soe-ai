@@ -40,6 +40,20 @@ scap_satellite_fetch_remote_resources: false
 # State of SCAP packages on the client
 # Allowed states: present, latest
 scap_satellite_package_state: present
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before installing or running
+# anything unless scap_satellite_policies includes at least
+# one policy with the pci-dss profile, the RHEL vendor
+# hardening baseline for PCI DSS (2.2.1). Site deviations
+# belong in a Satellite tailoring file, not another profile.
+# Other policies may be scanned alongside it.
+# Failed rules do not fail the run, as results are reported
+# to Satellite where non-compliance is tracked (2.2.1.c).
+# Retaining reports as assessment evidence is configured in
+# Satellite, not here.
+scap_satellite_pci_dss: false
 </pre>
 
 ## License
