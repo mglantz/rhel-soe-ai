@@ -2,9 +2,11 @@
 - name: Gather package facts
   ansible.builtin.package_facts:
   when:
-    - packages_verify_enable | bool
+    - packages_verify_enable | bool or
+      packages_verify_pci_dss | bool
     - packages_verify_check_missing | bool or
-      packages_verify_check_content | bool
+      packages_verify_check_content | bool or
+      packages_verify_pci_dss | bool
 
 - name: Verify packages present
   vars:
@@ -25,7 +27,10 @@
 
 - name: Verify packages content
   vars:
-    verify_packages: "{{ packages_verify | default(ansible_facts.packages.keys(), true) | sort | unique }}"
+    pci_packages: "{{ (packages_verify_pci_dss_packages | select | list)
+                      if packages_verify_pci_dss | bool and packages_verify | select | length > 0 else [] }}"
+    verify_packages: "{{ ((packages_verify | select | list) + pci_packages)
+                         | default(ansible_facts.packages.keys(), true) | sort | unique }}"
   check_mode: false
   # noqa: command-instead-of-module
   ansible.builtin.command: rpm -V {{ item }}
@@ -33,7 +38,24 @@
   ignore_errors: "{{ not packages_verify_fail_content | bool }}"
   failed_when: verified_packages.rc != 0
   changed_when: false
-  loop: "{{ (verify_packages | select) if packages_verify_enable else [] }}"
+  loop: "{{ (verify_packages | select)
+            if packages_verify_enable | bool or packages_verify_pci_dss | bool else [] }}"
   when:
-    - packages_verify_check_content | bool
+    - packages_verify_check_content | bool or
+      packages_verify_pci_dss | bool
     - item in ansible_facts.packages
+
+- name: Verify packages content against PCI DSS
+  vars:
+    # rpm -V prints a c attribute marker before the path of %config files
+    pci_changed: "{{ verified_packages.results | selectattr('stdout_lines', 'defined')
+                     | map(attribute='stdout_lines') | flatten
+                     | reject('match', '^\\S+\\s+c /') | list }}"
+  ansible.builtin.assert:
+    that: pci_changed | length == 0
+    quiet: true
+    fail_msg: |
+      PCI DSS violation - non-config files owned by verified packages
+      were changed or deleted (11.5.2):
+      {{ pci_changed | to_nice_yaml }}
+  when: packages_verify_pci_dss | bool
