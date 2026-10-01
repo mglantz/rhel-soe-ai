@@ -13,6 +13,8 @@ useradd_defaults_file:
 # Role provided alternatives:
 # * login.defs_cis_rhel89.j2   - CIS Level 2 - Server compliant config - RHEL 8/9
 # * login.defs_cis_rhel10.j2   - CIS Level 2 - Server compliant config - RHEL 10
+# * login.defs_pci_rhel89.j2   - CIS config with PCI DSS PASS_MAX_DAYS - RHEL 8/9
+# * login.defs_pci_rhel10.j2   - CIS config with PCI DSS PASS_MAX_DAYS - RHEL 10
 # * login.defs_rhel_rhel8.j2   - RHEL 8 default config
 # * login.defs_rhel_rhel9.j2   - RHEL 9 default config
 # * login.defs_rhel_rhel10.j2  - RHEL 10 default config
@@ -26,6 +28,7 @@ login_access_config_file:
 # PAM faillock configuration file faillock.conf template
 # Role provided alternatives:
 # * faillock_cis.conf          - CIS Level 2 - Server compliant config
+# * faillock_pci.conf          - CIS config with PCI DSS unlock_time
 # * faillock_rhel.conf         - RHEL default config
 faillock_config_file:
 
@@ -83,3 +86,25 @@ system_auth_profile_parameters:
 # Role provides CIS-compliant pam_d_su.j2 which enables
 # Centrify support automatically if using with-centrify
 system_auth_pam_d_su_file:
+
+# PCI DSS 4.0.1 guardrails, see docs/POLICY.md and
+# docs/PCI-DSS-v4_0_1.md. Enable only for in-scope systems.
+# When true, the role fails before making any change unless
+# the faillock, pwquality, pwhistory, login.defs and
+# authselect settings above are all set, and the selected
+# templates (as rendered) meet Requirement 8:
+#  - faillock deny 1-10 and unlock_time 0 or >= 1800 (8.3.4)
+#  - pwquality minlen >= 12 with digits and letters
+#    required, via minclass = 4 or dcredit < 0 plus
+#    lcredit or ucredit < 0 (8.3.6)
+#  - pwhistory remember >= 4 (8.3.7)
+#  - login.defs PASS_MAX_DAYS between 1 and
+#    accounts_policy_pci_dss_password_max_days (8.3.9)
+#  - a non-custom authselect profile must use
+#    with-faillock and with-pwhistory
+# The CIS templates fail only 8.3.4 and 8.3.9, use the
+# faillock_pci.conf and login.defs_pci_*.j2 variants.
+# PASS_MAX_DAYS only applies to new accounts, existing
+# local accounts are covered by accounts_local.
+accounts_policy_pci_dss: false
+accounts_policy_pci_dss_password_max_days: 90
