@@ -1,4 +1,15 @@
 ---
+- name: Verify shell idle timeout against PCI DSS
+  ansible.builtin.assert:
+    that:
+      - shell_profile_pci_dss_tmout | int >= 60
+      - shell_profile_pci_dss_tmout | int <= 900
+    quiet: true
+    fail_msg: >-
+      PCI DSS violation - shell_profile_pci_dss_tmout must be between 60
+      and 900 seconds (8.2.8), got {{ shell_profile_pci_dss_tmout }}
+  when: shell_profile_pci_dss | bool
+
 - name: Create shell profile file
   ansible.builtin.template:
     src: "{{ shell_profile_file }}"
@@ -7,3 +18,32 @@
   when:
     - shell_profile_file is not none
     - shell_profile_file | length > 0
+
+- name: Create PCI DSS shell idle timeout files
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: /etc/profile.d/zz-pci-dss.{{ item.ext }}
+    mode: '0644'
+  loop:
+    - ext: sh
+      content: |
+        # Managed by Ansible - PCI DSS 4.0.1 8.2.8 idle timeout
+        TMOUT={{ shell_profile_pci_dss_tmout | int }}
+        readonly TMOUT
+        export TMOUT
+    - ext: csh
+      content: |
+        # Managed by Ansible - PCI DSS 4.0.1 8.2.8 idle timeout
+        set -r autologout = {{ (shell_profile_pci_dss_tmout | int / 60) | int }}
+  loop_control:
+    label: /etc/profile.d/zz-pci-dss.{{ item.ext }}
+  when: shell_profile_pci_dss | bool
+
+- name: Remove PCI DSS shell idle timeout files
+  ansible.builtin.file:
+    path: /etc/profile.d/zz-pci-dss.{{ item }}
+    state: absent
+  loop:
+    - sh
+    - csh
+  when: not shell_profile_pci_dss | bool
